@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import Header from './components/header';
 import FileUpload from "./components/FileUpload";
+import FileManager from "./components/public_ds_manager";
 
 import 'bootstrap/dist/css/bootstrap.min.css';
 
@@ -8,8 +9,9 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 function App() {
   return (
       <div>
-        <Header />
-        <FileUpload/>
+          <Header />
+          <FileUpload/>
+          <FileManager/>
       </div>
   );
 }
