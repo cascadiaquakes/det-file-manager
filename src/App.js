@@ -15,7 +15,6 @@ Amplify.configure({ ...awsConfig });
 
 function App() {
     const [userAttributes, setUserAttributes] = useState(null);
-    const [AWS, setAwsConfigured] = useState(null);
 
     // Fetch user attributes
     const fetchAttributes = async () => {
@@ -27,24 +26,8 @@ function App() {
         }
     };
 
-    // Configure AWS SDK with Amplify credentials
-    const configureAWSSDK = async () => {
-        try {
-            const authSession = await fetchAuthSession(); // Get Amplify credentials
-            AWS.config.update({
-                region: awsConfig.aws_project_region, // Use the same region as Amplify
-                credentials: authSession, // Pass Amplify credentials to AWS SDK
-            });
-            setAwsConfigured(AWS); // Set AWS SDK
-            console.log('AWS SDK configured successfully:', AWS.config.credentials);
-        } catch (e) {
-            console.error('Error configuring AWS SDK:', e);
-        }
-    };
-
     useEffect(() => {
         fetchAttributes(); // Fetch attributes on component mount
-        configureAWSSDK();
     }, []);
 
     return (
@@ -53,8 +36,8 @@ function App() {
               <div>
                   <Header/>
                   <p>Welcome user id:{user.username}, attributes {userAttributes?.email}, group {userAttributes?.['custom:group_name']}</p>
-                  <FileUpload user={user} AWS={AWS}/>
-                  {/*<FileManager/>*/}
+                  <FileUpload/>
+                  <FileManager/>
                   <button onClick={signOut}>Sign out</button>
               </div>)}
       </Authenticator>

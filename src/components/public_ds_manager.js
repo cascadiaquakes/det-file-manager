@@ -1,66 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Form, Button, Container, Alert, ListGroup, Spinner } from 'react-bootstrap';
-import AWS from 'aws-sdk';
-
-const listFolders = async (s3, bucketName, benchmarkId, setFolders) => {
-    const params = {
-        Bucket: bucketName,
-        Prefix: benchmarkId + '/',  // Filter by the selected benchmark
-        Delimiter: '/', // This ensures we only get folders
-    };
-
-    try {
-        const data = await s3.listObjectsV2(params).promise();
-        const folderList = data.CommonPrefixes.map(prefix => prefix.Prefix.split('/')[1]);
-        setFolders(folderList);
-    } catch (err) {
-        console.error('Error fetching folders:', err);
-    }
-};
-
-const getBenchmarkIds = async (s3, setBenchmarkIds, bucketName) => {
-    const params = {
-        Bucket: bucketName,
-        Delimiter: '/', // This ensures only folders (prefixes) are returned
-    };
-
-    try {
-        const data = await s3.listObjectsV2(params).promise();
-        const ids = data.CommonPrefixes.map(prefix => prefix.Prefix.split('/')[0]);
-        setBenchmarkIds(ids);
-    } catch (err) {
-        console.error('Error fetching benchmark ids:', err);
-    }
-};
-
-const deleteFolder = async (s3, bucketName, folderPath, setDeleteSuccess, setDeleteError, setFolders, selectedBenchmarkId) => {
-    try {
-        const listParams = {
-            Bucket: bucketName,
-            Prefix: folderPath,
-        };
-        const data = await s3.listObjectsV2(listParams).promise();
-
-        const deleteParams = {
-            Bucket: bucketName,
-            Delete: {
-                Objects: data.Contents.map((file) => ({ Key: file.Key })),
-            },
-        };
-
-        await s3.deleteObjects(deleteParams).promise();
-
-        setDeleteSuccess(true);
-        setDeleteError(null);
-
-        // Refresh the folder list directly here
-        await listFolders(s3, bucketName, selectedBenchmarkId, setFolders);
-    } catch (err) {
-        console.error('Error deleting folder:', err);
-        setDeleteError(err.message);
-        setDeleteSuccess(false);
-    }
-};
+import { list, remove } from 'aws-amplify/storage'; // Import Amplify Storage methods
 
 function FileManager() {
     const [benchmarkIds, setBenchmarkIds] = useState([]);
@@ -70,55 +10,108 @@ function FileManager() {
     const [deleteSuccess, setDeleteSuccess] = useState(false);
     const [loading, setLoading] = useState(false); // Track if data is being loaded or deleted
 
-    // Configure AWS SDK (credentials and region should be managed via environment variables or AWS CLI)
-    AWS.config.update({
-        accessKeyId: process.env.REACT_APP_AWS_ACCESS_KEY_ID,
-        secretAccessKey: process.env.REACT_APP_AWS_SECRET_ACCESS_KEY,
-        region: process.env.REACT_APP_AWS_REGION || 'us-west-2',
-    });
+    // Fetch benchmark IDs using the list method
+    const getBenchmarkIds = async () => {
+        try {
+            const result = await list({
+                path: '', // Root path for the bucket
+                options: {
+                    listAll: true, // List all items
+                    bucket: 'visualization-bucket',
+                    level: 'protected',
+                },
+            });
+            const items = result.items || []; // Fallback to an empty array if items is undefined
+            // Extract unique folder names (benchmark IDs)
+            const ids = items
+                .filter(item => item.path && item.path.endsWith('/')) // Check if key exists and ends with '/'
+                .map(item => item.path.split('/')[0]); // Extract the folder name
 
-    // S3 instance for the file manager bucket (different bucket from the uploader)
-    const s3 = new AWS.S3();
-    const bucketName = process.env.REACT_APP_S3_PROD_NAME; // Bucket name for file management
+            setBenchmarkIds([...new Set(ids)]); // Remove duplicates
+        } catch (error) {
+            console.error('Error fetching benchmark IDs:', error);
+        }
+    };
 
-    // Fetch benchmark ids when the component mounts
     useEffect(() => {
-        getBenchmarkIds(s3, (ids) => {
-            // Filter out empty or falsy values before setting the state
-            setBenchmarkIds(ids.filter(id => id.trim() !== ''));
-        }, bucketName);
+        getBenchmarkIds();
     }, []);
 
     // Fetch benchmark ids (folders) from S3 for the file manager bucket
     useEffect(() => {
-        if (selectedBenchmarkId) {
-            setLoading(true);
-            listFolders(s3, bucketName, selectedBenchmarkId, setFolders);
-            setLoading(false);
-        } else {
-            setFolders([]); // Empty the list if no benchmark is selected
+        const fetchFolders = async () => {
+        if (!selectedBenchmarkId) {
+            setFolders([]); // Reset folders if no benchmark is selected
+            return;
         }
+
+        try {
+            setLoading(true);
+            const result = await list({
+                path: `${selectedBenchmarkId}/`, // Path scoped to the selected benchmark
+                options: {
+                    listAll: true,
+                    bucket: 'visualization-bucket',
+                },
+            });
+            console.log(result.items)
+            const folderList = result.items
+                .filter(item => item.path.endsWith('/')) // Include only folders
+                .map(item => item.path.split('/')[1]); // Extract folder names
+            setFolders(folderList);
+        } catch (error) {
+            console.error('Error fetching folders:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+    fetchFolders();
     }, [selectedBenchmarkId]);
+
+    // Handle deletion of a folder
+    const handleDeleteFolder = async (folderName) => {
+        if (window.confirm(`Are you sure you want to delete the folder "${folderName}" and its contents?`)) {
+            try {
+                setLoading(true);
+                setDeleteSuccess(false);
+                setDeleteError(null);
+
+                const folderPath = `${selectedBenchmarkId}/${folderName}/`;
+
+                // List all objects in the folder to delete
+                const result = await list({
+                    path: folderPath,
+                    options: {
+                        listAll: true,
+                        bucket: 'visualization-bucket',
+                    },
+                });
+
+                const deletePromises = result.items.map(item => {
+                    return remove(item.key, {
+                        bucket: 'visualization-bucket', // Replace with your production bucket
+                    });
+                });
+
+                // Delete all objects in the folder
+                await Promise.all(deletePromises);
+
+                setDeleteSuccess(true);
+                // Refresh the folders list after deletion
+                setFolders(folders.filter(folder => folder !== folderName));
+            } catch (error) {
+                console.error('Error deleting folder:', error);
+                setDeleteError(error.message || 'Failed to delete folder.');
+            } finally {
+                setLoading(false);
+            }
+        }
+    };
 
     const handleBenchmarkChange = (event) => {
         setSelectedBenchmarkId(event.target.value);
         setDeleteSuccess(false);
         setDeleteError(null);
-    };
-
-    const handleDeleteFolder = (folderName) => {
-        if (window.confirm(`Are you sure you want to delete the folder "${folderName}" and its contents?`)) {
-            setLoading(true);
-            deleteFolder(
-                s3,
-                bucketName,
-                `${selectedBenchmarkId}/${folderName}`,
-                setDeleteSuccess,
-                setDeleteError,
-                setFolders,
-                selectedBenchmarkId
-            ).finally(() => setLoading(false));
-        }
     };
 
     return (

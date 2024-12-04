@@ -1,23 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Form, Button, Container, Alert, Spinner } from 'react-bootstrap';
-import AWS from 'aws-sdk';
-
-
-const getBenchmarkIds = async (s3, setBenchmarkIds) => {
-    const params = {
-        Bucket: process.env.REACT_APP_S3_TMP_NAME,
-        Delimiter: '/', // This ensures only folders (prefixes) are returned
-    };
-
-    try {
-        const data = await s3.listObjectsV2(params).promise();
-        const ids = data.CommonPrefixes.map(prefix => prefix.Prefix.split('/')[0]);
-        setBenchmarkIds(ids);
-    } catch (err) {
-        console.error('Error fetching benchmark ids:', err);
-    }
-};
-
+import { list, uploadData } from 'aws-amplify/storage'; // Corrected import
 
 function FileUpload() {
     const [selectedFile, setSelectedFile] = useState(null);
@@ -26,23 +9,34 @@ function FileUpload() {
     const [benchmarkIds, setBenchmarkIds] = useState([]);
     const [selectedBenchmarkId, setSelectedBenchmarkId] = useState('');
     const [uploadMessage, setUploadMessage] = useState('');
-    const [loading, setLoading] = useState(false); // Track if upload is in progress
+    const [loading, setLoading] = useState(false);
 
-    // Configure AWS SDK (credentials and region should be managed via environment variables or AWS CLI)
-    AWS.config.update({
-        accessKeyId: process.env.REACT_APP_AWS_ACCESS_KEY_ID,
-        secretAccessKey: process.env.REACT_APP_AWS_SECRET_ACCESS_KEY,
-        region: process.env.REACT_APP_AWS_REGION || 'us-west-2',
-    });
+    // Fetch benchmark IDs using the list method
+    const getBenchmarkIds = async () => {
+        try {
+            const result = await list({
+                path: '', // Root path for the bucket
+                options: {
+                    listAll: true, // List all items
+                    bucket: 'upload-bucket',
+                    level: 'protected',
+                },
+            });
+            const items = result.items || []; // Fallback to an empty array if items is undefined
+            // Extract unique folder names (benchmark IDs)
+            const ids = items
+                .filter(item => item.path && item.path.endsWith('/')) // Check if key exists and ends with '/'
+                .map(item => item.path.split('/')[0]); // Extract the folder name
 
-    const s3 = new AWS.S3();
+            setBenchmarkIds([...new Set(ids)]); // Remove duplicates
+        } catch (error) {
+            console.error('Error fetching benchmark IDs:', error);
+            setUploadError('Failed to fetch benchmark IDs.');
+        }
+    };
 
-    // Fetch benchmark ids when the component mounts
     useEffect(() => {
-        getBenchmarkIds(s3, (ids) => {
-            // Filter out empty or falsy values before setting the state
-            setBenchmarkIds(ids.filter(id => id.trim() !== ''));
-        });
+        getBenchmarkIds();
     }, []);
 
     const handleFileChange = (event) => {
@@ -53,7 +47,7 @@ function FileUpload() {
         setSelectedBenchmarkId(event.target.value);
     };
 
-    const handleUpload = () => {
+    const handleUpload = async () => {
         if (!selectedFile) {
             setUploadError('Please select a file before uploading.');
             return;
@@ -62,67 +56,58 @@ function FileUpload() {
             setUploadError('Please select a benchmark before uploading.');
             return;
         }
-        setLoading(true);
-        const params = {
-            Bucket: process.env.REACT_APP_S3_TMP_NAME, // Replace with your bucket name from environment variables
-            Key: `${selectedBenchmarkId}/${selectedFile.name}`,
-            Body: selectedFile,
-            ContentType: selectedFile.type,
-        };
 
-        s3.upload(params, (err, data) => {
+        setLoading(true);
+        setUploadError(null);
+        setUploadSuccess(false);
+
+        try {
+            const filePath = `${selectedBenchmarkId}/${selectedFile.name}`;
+            await uploadData({
+                path: filePath,
+                data: selectedFile,
+                options:{
+                    bucket: 'upload-bucket',
+                }
+            });
+            setUploadSuccess(true);
+            setUploadMessage('File uploaded successfully to the selected benchmark ID.');
+        } catch (error) {
+            console.error('Upload failed:', error);
+            setUploadError('File upload failed. Please try again.');
+        } finally {
             setLoading(false);
-            if (err) {
-                console.error('Upload failed:', err);
-                setUploadError(err.message);
-            } else {
-                console.log('Upload successful:', data);
-                setUploadSuccess(true);
-                setUploadError(null);
-                setUploadMessage('File uploaded successfully to the selected benchmark ID.');
-            }
-        });
+        }
     };
 
     return (
-        <Container className="mt-4">
-            {uploadSuccess && <Alert variant="success">{uploadMessage}</Alert>}
-            {uploadError && <Alert variant="danger">Error: {uploadError}</Alert>}
+        <Container>
+            <h2>File Upload</h2>
             <Form>
-                {/* Benchmark ID Selector */}
-                <Form.Group controlId="formBenchmarkId" className="mb-3">
+                <Form.Group controlId="benchmarkSelect">
                     <Form.Label>Select Benchmark ID</Form.Label>
                     <Form.Control as="select" value={selectedBenchmarkId} onChange={handleBenchmarkChange}>
-                        <option value="">Select Benchmark ID</option>
-                        {benchmarkIds.map((id) => (
-                            <option key={id} value={id}>
+                        <option value="">-- Select a Benchmark --</option>
+                        {benchmarkIds.map((id, index) => (
+                            <option key={index} value={id}>
                                 {id}
                             </option>
                         ))}
                     </Form.Control>
                 </Form.Group>
 
-                {/* File Input */}
-                <Form.Group controlId="formFile" className="mb-3">
-                    <Form.Label>Choose a file to upload</Form.Label>
+                <Form.Group controlId="fileUpload">
+                    <Form.Label>Upload File</Form.Label>
                     <Form.Control type="file" onChange={handleFileChange} />
                 </Form.Group>
 
-                {/* Upload Button with Spinner */}
-                <Button
-                    variant="primary"
-                    onClick={handleUpload}
-                    disabled={loading} // Disable button while loading
-                    className={loading ? 'btn-secondary' : ''} // Add class to gray out button when loading
-                >
-                    {loading ? (
-                        <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" />
-                    ) : (
-                        'Upload'
-                    )}
-                    {loading && ' Uploading...'}
+                <Button variant="primary" onClick={handleUpload} disabled={loading}>
+                    {loading ? <Spinner animation="border" size="sm" /> : 'Upload'}
                 </Button>
             </Form>
+
+            {uploadSuccess && <Alert variant="success" className="mt-3">{uploadMessage}</Alert>}
+            {uploadError && <Alert variant="danger" className="mt-3">{uploadError}</Alert>}
         </Container>
     );
 }
