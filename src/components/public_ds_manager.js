@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Form, Button, Container, Alert, ListGroup, Spinner } from 'react-bootstrap';
-import { list, remove } from 'aws-amplify/storage'; // Import Amplify Storage methods
+import { list, remove } from 'aws-amplify/storage';
 
 function FileManager() {
     const [benchmarkIds, setBenchmarkIds] = useState([]);
@@ -14,18 +14,23 @@ function FileManager() {
     const getBenchmarkIds = async () => {
         try {
             const result = await list({
-                path: '', // Root path for the bucket
+                path: 'public_ds/', // Root path for the bucket
                 options: {
                     listAll: true, // List all items
-                    bucket: 'visualization-bucket',
+                    bucket: 'det-bucket',
                     level: 'protected',
                 },
             });
             const items = result.items || []; // Fallback to an empty array if items is undefined
             // Extract unique folder names (benchmark IDs)
             const ids = items
-                .filter(item => item.path && item.path.endsWith('/')) // Check if key exists and ends with '/'
-                .map(item => item.path.split('/')[0]); // Extract the folder name
+                .filter(item => item.path && item.path.endsWith('/'))
+                .map(item => {
+                    const parts = item.path.split('/');
+                    // parts[0] = 'upload', parts[1] = folderName, parts[2] = '' (if it ends with '/')
+                    return parts[1];
+                })
+                .filter(id => id.trim() !== '');
 
             setBenchmarkIds([...new Set(ids)]); // Remove duplicates
         } catch (error) {
@@ -48,16 +53,23 @@ function FileManager() {
         try {
             setLoading(true);
             const result = await list({
-                path: `${selectedBenchmarkId}/`, // Path scoped to the selected benchmark
+                path: `public_ds/${selectedBenchmarkId}/`, // Path scoped to the selected benchmark
                 options: {
                     listAll: true,
-                    bucket: 'visualization-bucket',
+                    bucket: 'det-bucket',
                 },
             });
-            console.log(result.items)
-            const folderList = result.items
-                .filter(item => item.path.endsWith('/')) // Include only folders
-                .map(item => item.path.split('/')[1]); // Extract folder names
+            const folderList = Array.from(
+                new Set(
+                    result.items
+                        .map(item => {
+                            const parts = item.path.split('/');
+                            return parts[2];
+                        })
+                        .filter(name => name && name.trim() !== '') // Filter out empty or undefined
+                )
+            );
+
             setFolders(folderList);
         } catch (error) {
             console.error('Error fetching folders:', error);
@@ -76,21 +88,19 @@ function FileManager() {
                 setDeleteSuccess(false);
                 setDeleteError(null);
 
-                const folderPath = `${selectedBenchmarkId}/${folderName}/`;
+                const folderPath = `public_ds/${selectedBenchmarkId}/${folderName}/`;
 
                 // List all objects in the folder to delete
                 const result = await list({
                     path: folderPath,
                     options: {
                         listAll: true,
-                        bucket: 'visualization-bucket',
+                        bucket: 'det-bucket',
                     },
                 });
-
+                console.log(result.items);
                 const deletePromises = result.items.map(item => {
-                    return remove(item.key, {
-                        bucket: 'visualization-bucket', // Replace with your production bucket
-                    });
+                    return remove({path: item.path, bucket: 'det-bucket'});
                 });
 
                 // Delete all objects in the folder
@@ -118,7 +128,7 @@ function FileManager() {
         <Container className="mt-4">
             {deleteSuccess && <Alert variant="success">Folder deleted successfully!</Alert>}
             {deleteError && <Alert variant="danger">Error: {deleteError}</Alert>}
-
+            <h2>File management</h2>
             <Form>
                 {/* Benchmark ID Selector */}
                 <Form.Group controlId="formBenchmarkId" className="mb-3">

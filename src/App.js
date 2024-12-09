@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import Header from './components/header';
 import FileUpload from "./components/FileUpload";
-import AWS from 'aws-sdk';
 import FileManager from "./components/public_ds_manager";
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { Amplify } from 'aws-amplify';
 import { Authenticator } from '@aws-amplify/ui-react';
-import { fetchUserAttributes, fetchAuthSession } from 'aws-amplify/auth';
+import { fetchUserAttributes } from 'aws-amplify/auth';
 import '@aws-amplify/ui-react/styles.css';
 import awsConfig from './awsConfig';
 
