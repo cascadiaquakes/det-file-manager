@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Form, Button, Container, Alert, ListGroup, Spinner } from 'react-bootstrap';
-import { list, remove } from 'aws-amplify/storage';
+import { list, remove, getProperties } from 'aws-amplify/storage';
 
-function FileManager() {
+function FileManager({user_metadata}) {
     const [benchmarkIds, setBenchmarkIds] = useState([]);
     const [selectedBenchmarkId, setSelectedBenchmarkId] = useState('');
     const [folders, setFolders] = useState([]);
@@ -52,25 +52,45 @@ function FileManager() {
 
         try {
             setLoading(true);
+
+            // List all items in the benchmark folder
             const result = await list({
-                path: `public_ds/${selectedBenchmarkId}/`, // Path scoped to the selected benchmark
+                path: `public_ds/${selectedBenchmarkId}/`,
                 options: {
                     listAll: true,
                     bucket: 'det-bucket',
                 },
             });
-            const folderList = Array.from(
-                new Set(
-                    result.items
-                        .map(item => {
-                            const parts = item.path.split('/');
-                            return parts[2];
-                        })
-                        .filter(name => name && name.trim() !== '') // Filter out empty or undefined
-                )
+            // Initialize an empty folder list
+            const filteredFolderSet = new Set();
+
+            // Filter items to process only `metadata.json` files
+            const metadataFiles = result.items.filter((item) => item.path.endsWith('metadata.json'));
+
+            // Fetch metadata for each `metadata.json` file
+            await Promise.all(
+                metadataFiles.map(async (metadataFile) => {
+                    try {
+                        // Fetch only the metadata of the file
+                        const response = await getProperties({
+                                path: metadataFile.path,
+                                   options:{
+                                                bucket: 'det-bucket',
+                                            }
+                        });
+                        // // Check if the userId matches the current user's sub
+                        if (response.metadata && response.metadata.userid === user_metadata.sub) {
+                            const folderName = metadataFile.path.split('/')[2]; // Extract folder name
+                            filteredFolderSet.add(folderName);
+                        }
+                    } catch (error) {
+                        console.warn(`Error fetching metadata for ${metadataFile.path}:`, error);
+                    }
+                })
             );
 
-            setFolders(folderList);
+            // Convert the filtered folder set to an array and update the state
+            setFolders(Array.from(filteredFolderSet));
         } catch (error) {
             console.error('Error fetching folders:', error);
         } finally {
@@ -98,7 +118,6 @@ function FileManager() {
                         bucket: 'det-bucket',
                     },
                 });
-                console.log(result.items);
                 const deletePromises = result.items.map(item => {
                     return remove({path: item.path, bucket: 'det-bucket'});
                 });
@@ -129,6 +148,7 @@ function FileManager() {
             {deleteSuccess && <Alert variant="success">Folder deleted successfully!</Alert>}
             {deleteError && <Alert variant="danger">Error: {deleteError}</Alert>}
             <h2>File management</h2>
+            <p>Here you can manage your previous uploads</p>
             <Form>
                 {/* Benchmark ID Selector */}
                 <Form.Group controlId="formBenchmarkId" className="mb-3">
@@ -147,7 +167,7 @@ function FileManager() {
             <h4>Folders under "{selectedBenchmarkId}"</h4>
 
             {loading ? (
-                <Spinner animation="border" role="status" />
+                <Spinner animation="border" role="status"/>
             ) : (
                 <ListGroup>
                     {folders.length === 0 ? (

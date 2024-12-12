@@ -33,14 +33,21 @@ function App() {
       <Authenticator hideSignUp >
           {({ signOut, user}) => (
               <div>
-                  <Header/>
-                  <p>Welcome user id:{user.username}, attributes {userAttributes?.email}, group {userAttributes?.['custom:group_name']}</p>
-                  <FileUpload/>
-                  <FileManager/>
-                  <button onClick={signOut}>Sign out</button>
-              </div>)}
+                  <Header user={userAttributes} signOut={signOut} />
+                  <div style={{display: 'flex', gap: '20px', padding: '20px'}}>
+                      {/* Left Column */}
+                      <div style={{flex: 1}}>
+                          <FileUpload user_metadata={userAttributes}/>
+                      </div>
+                      {/* Right Column */}
+                      <div style={{flex: 1}}>
+                          <FileManager user_metadata={userAttributes}/>
+                      </div>
+                  </div>
+              </div>
+          )}
       </Authenticator>
-  );
+    );
 }
 
 export default App;

@@ -3,7 +3,7 @@ import { Form, Container, Alert, Spinner } from 'react-bootstrap';
 import { list } from 'aws-amplify/storage';
 import { StorageManager } from '@aws-amplify/ui-react-storage';
 
-function FileUpload() {
+function FileUpload({user_metadata}) {
     const [benchmarkIds, setBenchmarkIds] = useState([]);
     const [selectedBenchmarkId, setSelectedBenchmarkId] = useState('');
     const [uploadSuccess, setUploadSuccess] = useState(false);
@@ -52,9 +52,29 @@ function FileUpload() {
         setUploadMessage('');
     };
 
+    const processFile = async ({ file, key }) => {
+        try {
+            // Return the file with metadata
+            return {
+                file,
+                key, // Use the generated or provided key
+                metadata: {
+                    userid: user_metadata.sub,
+                    useremail: user_metadata.email,
+                    usergroup: user_metadata['custom:group_name'],
+                    benchmarkId: selectedBenchmarkId, // Add any other relevant metadata
+                },
+            };
+        } catch (error) {
+            console.error('Error fetching user info:', error);
+            throw new Error('Unable to fetch user info for metadata');
+        }
+    };
+
     return (
         <Container>
             <h2>File Upload</h2>
+            <p>Upload your solution as a .zip after selecting the correct benchmark</p>
             {uploadSuccess && <Alert variant="success" className="mt-3">{uploadMessage}</Alert>}
             {uploadError && <Alert variant="danger" className="mt-3">{uploadError}</Alert>}
             {loading && <Spinner animation="border" role="status" className="mb-3" />}
@@ -80,6 +100,7 @@ function FileUpload() {
                         // acceptedFileTypes={['.zip']}
                         path={`upload/${selectedBenchmarkId}/`}
                         maxFileCount={1}
+                        processFile={processFile}
                         providerOptions={{
                             bucket: 'det-bucket'
                         }}
