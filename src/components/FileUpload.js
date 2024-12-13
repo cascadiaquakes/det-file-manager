@@ -3,6 +3,7 @@ import { Form, Container, Alert, Spinner } from 'react-bootstrap';
 import { list } from 'aws-amplify/storage';
 import { StorageManager } from '@aws-amplify/ui-react-storage';
 
+
 function FileUpload({user_metadata}) {
     const [benchmarkIds, setBenchmarkIds] = useState([]);
     const [selectedBenchmarkId, setSelectedBenchmarkId] = useState('');
@@ -28,7 +29,6 @@ function FileUpload({user_metadata}) {
                 .filter(item => item.path && item.path.endsWith('/'))
                 .map(item => {
                     const parts = item.path.split('/');
-                    // parts[0] = 'upload', parts[1] = folderName, parts[2] = '' (if it ends with '/')
                     return parts[1];
                 })
                 .filter(id => id.trim() !== '');
@@ -97,7 +97,7 @@ function FileUpload({user_metadata}) {
                 <div className="mt-4">
                     <h4>Upload a File to "{selectedBenchmarkId}"</h4>
                     <StorageManager
-                        // acceptedFileTypes={['.zip']}
+                        acceptedFileTypes={['.zip']}
                         path={`upload/${selectedBenchmarkId}/`}
                         maxFileCount={1}
                         processFile={processFile}
