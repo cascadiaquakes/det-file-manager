@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Form, Container, Alert, Spinner } from 'react-bootstrap';
 import { list } from 'aws-amplify/storage';
 import { StorageManager } from '@aws-amplify/ui-react-storage';
+import { Amplify } from 'aws-amplify';
+import { fetchAuthSession } from 'aws-amplify/auth';
 
 
 function FileUpload({user_metadata}) {
@@ -39,6 +41,49 @@ function FileUpload({user_metadata}) {
         } finally {
             setLoading(false);
         }
+    };
+
+    async function getAuthToken() {
+        try {
+            const { idToken } = (await fetchAuthSession()).tokens ?? {};
+            return idToken?.toString();
+        } catch (error) {
+            console.error('Error getting auth token:', error);
+            throw error;
+        }
+    }
+
+    const pollProcessingStatus = (userId, fileId) => {
+        const intervalId = setInterval(async () => {
+            try {
+                // Create URL object to handle parameters
+                const url = new URL(`${process.env.REACT_APP_API_URL}/status`);
+                url.searchParams.append('userId', userId);
+                url.searchParams.append('fileId', fileId);
+
+                const token = await getAuthToken();
+
+                const response = await fetch(url.toString(), {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                const data = await response.json();
+                if (data.status === 'completed') {
+                    setUploadMessage('✅ File processed successfully.');
+                    clearInterval(intervalId);
+                } else if (data.status === 'failed') {
+                    setUploadMessage(`❌ Processing failed: ${data.error || 'Unknown error'}`);
+                    setUploadError(data.error || 'Processing failed.');
+                    clearInterval(intervalId);
+                } else {
+                    console.log('Still processing...');
+                }
+            } catch (error) {
+                console.error('Error checking processing status:', error);
+            }
+        }, 10000); // every 10 seconds
     };
 
     useEffect(() => {
@@ -104,10 +149,17 @@ function FileUpload({user_metadata}) {
                         providerOptions={{
                             bucket: 'det-bucket'
                         }}
-                        onUploadSuccess={(event) => {
+                        onUploadSuccess={async (event) => {
                             console.log('Upload success:', event);
                             setUploadSuccess(true);
-                            setUploadMessage('File uploaded successfully to the selected benchmark ID.');
+                            setUploadMessage('File uploaded successfully. Processing your files...');
+
+                            const fileKey = event?.key;
+                            const fileId = fileKey?.split('/').pop(); // Assuming fileId is the filename
+                            const userId = user_metadata.sub;
+
+                            // Start polling
+                            pollProcessingStatus(userId, fileId);
                         }}
                         onUploadError={(error) => {
                             console.error('Upload failed:', error);
