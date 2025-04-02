@@ -10,16 +10,16 @@ function Header({signOut, user}) {
                 <div className="d-flex align-items-center">
                     <Navbar.Brand href="https://cascadiaquakes.org/">
                         <img
-                            src="https://cascadiaquakes.org/wp-content/uploads/2023/10/Crescent-Logos-Horizontal-White-230x62.png"
+                            src="/Crescent_Logo.png"
                             alt="Cascadia Quakes Logo"
-                            style={{ maxWidth: '100%', height: 'auto' }}
+                            style={{ height: '60px' }}
                         />
                     </Navbar.Brand>
                     <Nav.Link href="https://www.nsf.gov">
                         <img
-                            src="https://new.nsf.gov/themes/custom/nsf_theme/components/sdc-components/molecules/logo/logo-desktop.svg"
+                            src="/USNSF_Logo.png"
                             alt="NSF Logo"
-                            style={{width: '40%', height: 'auto'}}
+                            style={{height: '90px'}}
                         />
                     </Nav.Link>
                 </div>
