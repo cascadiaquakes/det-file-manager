@@ -34,7 +34,7 @@ function FileManager({user_metadata}) {
 
             setBenchmarkIds([...new Set(ids)]); // Remove duplicates
         } catch (error) {
-            console.error('Error fetching benchmark IDs:', error);
+            console.error('Error fetching benchmark IDs:', error?.name || error?.message);
         }
     };
 
@@ -84,7 +84,7 @@ function FileManager({user_metadata}) {
                             filteredFolderSet.add(folderName);
                         }
                     } catch (error) {
-                        console.warn(`Error fetching metadata for ${metadataFile.path}:`, error);
+                        console.warn(`Error fetching metadata for ${metadataFile.path}:`, error?.name || error?.message);
                     }
                 })
             );
@@ -92,7 +92,7 @@ function FileManager({user_metadata}) {
             // Convert the filtered folder set to an array and update the state
             setFolders(Array.from(filteredFolderSet));
         } catch (error) {
-            console.error('Error fetching folders:', error);
+            console.error('Error fetching folders:', error?.name || error?.message);
         } finally {
             setLoading(false);
         }
@@ -129,7 +129,7 @@ function FileManager({user_metadata}) {
                 // Refresh the folders list after deletion
                 setFolders(folders.filter(folder => folder !== folderName));
             } catch (error) {
-                console.error('Error deleting folder:', error);
+                console.error('Error deleting folder:', error?.name || error?.message);
                 setDeleteError(error.message || 'Failed to delete folder.');
             } finally {
                 setLoading(false);
