@@ -83,7 +83,7 @@ function FileUpload({user_metadata}) {
             } catch (error) {
                 console.error('Error checking processing status:', error);
             }
-        }, 10000); // every 10 seconds
+        }, 5000); // every 10 seconds
     };
 
     useEffect(() => {
@@ -155,9 +155,8 @@ function FileUpload({user_metadata}) {
                             setUploadMessage('File uploaded successfully. Processing your files...');
 
                             const fileKey = event?.key;
-                            const fileId = fileKey?.split('/').pop(); // Assuming fileId is the filename
+                            const fileId = fileKey?.split('/').pop();
                             const userId = user_metadata.sub;
-
                             // Start polling
                             pollProcessingStatus(userId, fileId);
                         }}
