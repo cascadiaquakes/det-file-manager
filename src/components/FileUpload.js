@@ -36,7 +36,7 @@ function FileUpload({user_metadata}) {
                 .filter(id => id.trim() !== '');
             setBenchmarkIds([...new Set(ids)]);
         } catch (error) {
-            console.error('Error fetching benchmark IDs:', error);
+            console.error('Error fetching benchmark IDs:', error?.name || error?.message);
             setUploadError('Failed to fetch benchmark IDs.');
         } finally {
             setLoading(false);
@@ -48,7 +48,7 @@ function FileUpload({user_metadata}) {
             const { idToken } = (await fetchAuthSession()).tokens ?? {};
             return idToken?.toString();
         } catch (error) {
-            console.error('Error getting auth token:', error);
+            console.error('Error getting auth token:', error?.name || error?.message);
             throw error;
         }
     }
@@ -81,7 +81,7 @@ function FileUpload({user_metadata}) {
                     console.log('Still processing...');
                 }
             } catch (error) {
-                console.error('Error checking processing status:', error);
+                console.error('Error checking processing status:', error?.name || error?.message);
             }
         }, 5000); // every 10 seconds
     };
@@ -111,7 +111,7 @@ function FileUpload({user_metadata}) {
                 },
             };
         } catch (error) {
-            console.error('Error fetching user info:', error);
+            console.error('Error fetching user info:', error?.name || error?.message);
             throw new Error('Unable to fetch user info for metadata');
         }
     };
@@ -161,9 +161,7 @@ function FileUpload({user_metadata}) {
                             pollProcessingStatus(userId, fileId);
                         }}
                         onUploadError={(error) => {
-                            console.error('Upload failed:', error);
-                            console.error('Full error object:', JSON.stringify(error, null, 2));
-
+                            console.error('Upload failed:', error?.name || error?.message);
                             setUploadError('File upload failed. Please try again.');
                         }}
                     />
