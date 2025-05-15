@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Form, Container, Alert, Spinner } from 'react-bootstrap';
+import { Form, Container, Alert, Spinner, Modal, Button } from 'react-bootstrap';
 import { list } from 'aws-amplify/storage';
 import { StorageManager } from '@aws-amplify/ui-react-storage';
 import { Amplify } from 'aws-amplify';
@@ -13,6 +13,8 @@ function FileUpload({user_metadata}) {
     const [uploadError, setUploadError] = useState(null);
     const [uploadMessage, setUploadMessage] = useState('');
     const [loading, setLoading] = useState(false);
+    const [termsAccepted, setTermsAccepted] = useState(false);
+    const [showTerms, setShowTerms] = useState(false);
 
     // Fetch benchmark IDs from the upload bucket
     const getBenchmarkIds = async () => {
@@ -116,6 +118,23 @@ function FileUpload({user_metadata}) {
         }
     };
 
+    const handleTermsClick = (e) => {
+        e.preventDefault();
+        setShowTerms(true);
+    };
+
+    const termsAndConditionsText = `
+        Terms and Conditions
+
+        1. Introduction
+        Welcome to our benchmark submission platform. By using this service, you agree to comply with and be bound by the following terms and conditions.
+
+        2. Submission Rules
+        - All submissions must be your original work or work for which you have proper usage rights.
+        - Submissions must comply with the specified format requirements.
+        - You agree not to submit malicious code, malware, or any content that could harm our systems.
+    `;
+
     return (
         <Container>
             <h2>File Upload</h2>
@@ -136,9 +155,22 @@ function FileUpload({user_metadata}) {
                         ))}
                     </Form.Control>
                 </Form.Group>
+
+                <Form.Group className="mt-3" controlId="termsCheckbox">
+                    <Form.Check
+                        type="checkbox"
+                        checked={termsAccepted}
+                        onChange={(e) => setTermsAccepted(e.target.checked)}
+                        label={
+                            <span>
+                                I accept the <a href="#" onClick={handleTermsClick}>Terms and Conditions</a>
+                            </span>
+                        }
+                    />
+                </Form.Group>
             </Form>
 
-            {selectedBenchmarkId && (
+            {selectedBenchmarkId && termsAccepted ? (
                 <div className="mt-4">
                     <h4>Upload a File to "{selectedBenchmarkId}"</h4>
                     <StorageManager
@@ -149,6 +181,7 @@ function FileUpload({user_metadata}) {
                         providerOptions={{
                             bucket: 'det-bucket'
                         }}
+                        isDisabled={!termsAccepted}
                         onUploadSuccess={async (event) => {
                             console.log('Upload success:', event);
                             setUploadSuccess(true);
@@ -165,8 +198,46 @@ function FileUpload({user_metadata}) {
                             setUploadError('File upload failed. Please try again.');
                         }}
                     />
+                    {!termsAccepted && (
+                        <Alert variant="warning" className="mt-2">
+                            You must accept the terms and conditions before uploading.
+                        </Alert>
+                    )}
                 </div>
-            )}
+            ) : selectedBenchmarkId && !termsAccepted ? (
+                <div className="mt-4">
+                    <h4>Upload a File to "{selectedBenchmarkId}"</h4>
+                    <Alert variant="warning">
+                        Please accept the Terms and Conditions to enable file uploads.
+                    </Alert>
+                </div>
+            ) : null}
+
+            {/* Terms and Conditions Modal */}
+            <Modal show={showTerms} onHide={() => setShowTerms(false)} size="lg">
+                <Modal.Header closeButton>
+                    <Modal.Title>Terms and Conditions</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>
+                        {termsAndConditionsText}
+                    </pre>
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button variant="secondary" onClick={() => setShowTerms(false)}>
+                        Close
+                    </Button>
+                    <Button
+                        variant="primary"
+                        onClick={() => {
+                            setTermsAccepted(true);
+                            setShowTerms(false);
+                        }}
+                    >
+                        Accept
+                    </Button>
+                </Modal.Footer>
+            </Modal>
         </Container>
     );
 }
