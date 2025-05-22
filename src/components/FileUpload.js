@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Form, Container, Alert, Spinner } from 'react-bootstrap';
+import { Form, Container, Alert, Spinner, Modal, Button } from 'react-bootstrap';
 import { list } from 'aws-amplify/storage';
 import { StorageManager } from '@aws-amplify/ui-react-storage';
+import { Amplify } from 'aws-amplify';
+import { fetchAuthSession } from 'aws-amplify/auth';
 
 
 function FileUpload({user_metadata}) {
@@ -11,6 +13,8 @@ function FileUpload({user_metadata}) {
     const [uploadError, setUploadError] = useState(null);
     const [uploadMessage, setUploadMessage] = useState('');
     const [loading, setLoading] = useState(false);
+    const [termsAccepted, setTermsAccepted] = useState(false);
+    const [showTerms, setShowTerms] = useState(false);
 
     // Fetch benchmark IDs from the upload bucket
     const getBenchmarkIds = async () => {
@@ -34,11 +38,54 @@ function FileUpload({user_metadata}) {
                 .filter(id => id.trim() !== '');
             setBenchmarkIds([...new Set(ids)]);
         } catch (error) {
-            console.error('Error fetching benchmark IDs:', error);
+            console.error('Error fetching benchmark IDs:', error?.name || error?.message);
             setUploadError('Failed to fetch benchmark IDs.');
         } finally {
             setLoading(false);
         }
+    };
+
+    async function getAuthToken() {
+        try {
+            const { idToken } = (await fetchAuthSession()).tokens ?? {};
+            return idToken?.toString();
+        } catch (error) {
+            console.error('Error getting auth token:', error?.name || error?.message);
+            throw error;
+        }
+    }
+
+    const pollProcessingStatus = (userId, fileId) => {
+        const intervalId = setInterval(async () => {
+            try {
+                // Create URL object to handle parameters
+                const url = new URL(`${process.env.REACT_APP_API_URL}/status`);
+                url.searchParams.append('userId', userId);
+                url.searchParams.append('fileId', fileId);
+
+                const token = await getAuthToken();
+
+                const response = await fetch(url.toString(), {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                const data = await response.json();
+                if (data.status === 'completed') {
+                    setUploadMessage('✅ File processed successfully.');
+                    clearInterval(intervalId);
+                } else if (data.status === 'failed') {
+                    setUploadMessage(`❌ Processing failed: ${data.error || 'Unknown error'}`);
+                    setUploadError(data.error || 'Processing failed.');
+                    clearInterval(intervalId);
+                } else {
+                    console.log('Still processing...');
+                }
+            } catch (error) {
+                console.error('Error checking processing status:', error?.name || error?.message);
+            }
+        }, 5000); // every 10 seconds
     };
 
     useEffect(() => {
@@ -66,10 +113,27 @@ function FileUpload({user_metadata}) {
                 },
             };
         } catch (error) {
-            console.error('Error fetching user info:', error);
+            console.error('Error fetching user info:', error?.name || error?.message);
             throw new Error('Unable to fetch user info for metadata');
         }
     };
+
+    const handleTermsClick = (e) => {
+        e.preventDefault();
+        setShowTerms(true);
+    };
+
+    const termsAndConditionsText = `
+        Terms and Conditions
+
+        1. Introduction
+        Welcome to our benchmark submission platform. By using this service, you agree to comply with and be bound by the following terms and conditions.
+
+        2. Submission Rules
+        - All submissions must be your original work or work for which you have proper usage rights.
+        - Submissions must comply with the specified format requirements.
+        - You agree not to submit malicious code, malware, or any content that could harm our systems.
+    `;
 
     return (
         <Container>
@@ -91,9 +155,22 @@ function FileUpload({user_metadata}) {
                         ))}
                     </Form.Control>
                 </Form.Group>
+
+                <Form.Group className="mt-3" controlId="termsCheckbox">
+                    <Form.Check
+                        type="checkbox"
+                        checked={termsAccepted}
+                        onChange={(e) => setTermsAccepted(e.target.checked)}
+                        label={
+                            <span>
+                                I accept the <a href="#" onClick={handleTermsClick}>Terms and Conditions</a>
+                            </span>
+                        }
+                    />
+                </Form.Group>
             </Form>
 
-            {selectedBenchmarkId && (
+            {selectedBenchmarkId && termsAccepted ? (
                 <div className="mt-4">
                     <h4>Upload a File to "{selectedBenchmarkId}"</h4>
                     <StorageManager
@@ -104,20 +181,63 @@ function FileUpload({user_metadata}) {
                         providerOptions={{
                             bucket: 'det-bucket'
                         }}
-                        onUploadSuccess={(event) => {
+                        isDisabled={!termsAccepted}
+                        onUploadSuccess={async (event) => {
                             console.log('Upload success:', event);
                             setUploadSuccess(true);
-                            setUploadMessage('File uploaded successfully to the selected benchmark ID.');
+                            setUploadMessage('File uploaded successfully. Processing your files...');
+
+                            const fileKey = event?.key;
+                            const fileId = fileKey?.split('/').pop();
+                            const userId = user_metadata.sub;
+                            // Start polling
+                            pollProcessingStatus(userId, fileId);
                         }}
                         onUploadError={(error) => {
-                            console.error('Upload failed:', error);
-                            console.error('Full error object:', JSON.stringify(error, null, 2));
-
+                            console.error('Upload failed:', error?.name || error?.message);
                             setUploadError('File upload failed. Please try again.');
                         }}
                     />
+                    {!termsAccepted && (
+                        <Alert variant="warning" className="mt-2">
+                            You must accept the terms and conditions before uploading.
+                        </Alert>
+                    )}
                 </div>
-            )}
+            ) : selectedBenchmarkId && !termsAccepted ? (
+                <div className="mt-4">
+                    <h4>Upload a File to "{selectedBenchmarkId}"</h4>
+                    <Alert variant="warning">
+                        Please accept the Terms and Conditions to enable file uploads.
+                    </Alert>
+                </div>
+            ) : null}
+
+            {/* Terms and Conditions Modal */}
+            <Modal show={showTerms} onHide={() => setShowTerms(false)} size="lg">
+                <Modal.Header closeButton>
+                    <Modal.Title>Terms and Conditions</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>
+                        {termsAndConditionsText}
+                    </pre>
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button variant="secondary" onClick={() => setShowTerms(false)}>
+                        Close
+                    </Button>
+                    <Button
+                        variant="primary"
+                        onClick={() => {
+                            setTermsAccepted(true);
+                            setShowTerms(false);
+                        }}
+                    >
+                        Accept
+                    </Button>
+                </Modal.Footer>
+            </Modal>
         </Container>
     );
 }
