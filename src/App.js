@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Header from './components/header';
 import FileUpload from "./components/FileUpload";
 import FileManager from "./components/public_ds_manager";
+import BenchmarkLinks from "./components/BenchmarkLinks";
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { Amplify } from 'aws-amplify';
 import { Authenticator, useAuthenticator } from '@aws-amplify/ui-react';
@@ -51,6 +52,7 @@ function AppLayout({user, userAttributes, signOut}) {
                     <FileManager user_metadata={userAttributes} />
                 </div>
             </div>
+            <BenchmarkLinks />
         </div>
     );
 }
