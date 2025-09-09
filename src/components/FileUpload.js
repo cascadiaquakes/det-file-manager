@@ -138,7 +138,8 @@ function FileUpload({user_metadata}) {
     return (
         <Container>
             <h2>File Upload</h2>
-            <p>Upload your solution as a .zip after selecting the correct benchmark</p>
+            <p>Upload your solution as a .zip after selecting the correct benchmark. Naming convention
+                is <code>nameOfModeler_version.zip</code></p>
             {uploadSuccess && <Alert variant="success" className="mt-3">{uploadMessage}</Alert>}
             {uploadError && <Alert variant="danger" className="mt-3">{uploadError}</Alert>}
             {loading && <Spinner animation="border" role="status" className="mb-3" />}
