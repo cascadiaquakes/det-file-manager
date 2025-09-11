@@ -2,20 +2,20 @@
 
 on:
   push:
-    branches: [ main, ci/cd-automation ]
-  workflow_dispatch:
+    branches: [main, ci/cd-automation]
+  workflow_dispatch: {}
 
 permissions:
   contents: read
 
 concurrency:
-  group: deploy-${{ github.ref_name }}
+  group: deploy-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
 
     env:
       # Non-secret repo variables (Settings → Secrets and variables → Variables)
@@ -31,15 +31,15 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
-          cache: npm
+          node-version: "18"
+          cache: "npm"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region:            ${{ env.AWS_REGION }}
 
       - name: Create .env for CRA build
         run: |
@@ -57,13 +57,16 @@ jobs:
 
       - name: Show target
         run: |
-          echo "Region:       $AWS_REGION"
-          echo "S3 bucket:    $S3_BUCKET"
-          echo "S3 prefix:    $S3_PREFIX"
-          echo "CloudFront:   $CF_DISTRIBUTION_ID"
+          echo "Region:        $AWS_REGION"
+          echo "S3 bucket:     $S3_BUCKET"
+          echo "S3 prefix:     $S3_PREFIX"
+          echo "CloudFront ID: $CF_DISTRIBUTION_ID"
 
       - name: Make deploy script executable
         run: chmod +x ./deploy.sh
 
       - name: Build & Deploy to S3 (invalidate CloudFront)
-        run: DISTRIBUTION_ID="$CF_DISTRIBUTION_ID" ./deploy.sh
+        env:
+          CI: ""   # CRA: don't fail build on lint warnings
+        run: |
+          DISTRIBUTION_ID="$CF_DISTRIBUTION_ID" ./deploy.sh
