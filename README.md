@@ -1,70 +1,59 @@
-# Getting Started with Create React App
+# DET File Manager
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+React frontend for the DET file manager.
 
-## Available Scripts
+## Architecture
 
-In the project directory, you can run:
+Static site (Create React App) built locally, uploaded to **S3** and served via **CloudFront**.
 
-### `npm start`
+* **S3 bucket:** `crescent-react-hosting` (prefix: `det-uploader-app/`)
+* **CloudFront (dev):** [https://det-uploader.cascadiaquakes.org/](https://det-uploader.cascadiaquakes.org/)
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## Local development
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+**Prereqs:** Node.js + npm
 
-### `npm test`
+```bash
+npm ci
+npm start
+# http://localhost:3000
+```
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## Manual deploy (dev)
 
-### `npm run build`
+Prereqs: AWS CLI v2 logged into the earthscope-crescent account with access to the bucket and CloudFront.
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+1. Put runtime settings in a local **`.env`** (not committed). Example keys are in **`.env.example`**.
+2. Build & deploy via the script (invalidates CloudFront so changes show immediately):
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+**macOS/Linux**
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+```bash
+export DISTRIBUTION_ID=E394LPINKP5I9U
+chmod +x ./deploy.sh   # one-time
+./deploy.sh
+```
 
-### `npm run eject`
+**Windows PowerShell**
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+```powershell
+$env:DISTRIBUTION_ID = "E394LPINKP5I9U"
+./deploy.sh
+```
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+That script:
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+* builds the app (`npm run build`)
+* syncs to `s3://crescent-react-hosting/det-uploader-app/` with proper cache headers
+* invalidates `/*` on the CloudFront distribution
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+**Verify:** open [https://det-uploader.cascadiaquakes.org/](https://det-uploader.cascadiaquakes.org/) (hard refresh if needed).
 
-## Learn More
+## Troubleshooting
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+* **AccessDenied at the site:** CloudFront ↔ S3 permissions (OAC) may be misconfigured—needs fix in AWS console.
+* **Auth errors:** ensure `.env` has the Cognito/UserPool/API values used by `awsConfig.js`; rebuild and redeploy.
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+## Cost
 
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+Main cost is S3 storage + CloudFront bandwidth. To pause serving, disable the CloudFront distribution.
