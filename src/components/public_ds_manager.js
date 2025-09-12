@@ -17,7 +17,6 @@ function FileManager({user_metadata}) {
                 path: 'public_ds/', // Root path for the bucket
                 options: {
                     listAll: true, // List all items
-                    bucket: 'det-bucket',
                     level: 'protected',
                 },
             });

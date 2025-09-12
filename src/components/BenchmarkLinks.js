@@ -13,7 +13,6 @@ const BenchmarkLinks = () => {
                     path: 'public_ds/',
                     options: {
                         listAll: true,
-                        bucket: 'det-bucket',
                         level: 'protected',
                     },
                 });
