@@ -1,70 +1,165 @@
-# Getting Started with Create React App
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+# DET File Manager
 
-## Available Scripts
+React frontend for the DET uploader.
 
-In the project directory, you can run:
+**Live:** https://det-uploader.cascadiaquakes.org/
 
-### `npm start`
+---
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## Architecture
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+Static site (Create React App) built, uploaded to **S3**, and served via **CloudFront**.
 
-### `npm test`
+- **S3 bucket:** `crescent-react-hosting` (prefix **`det-uploader-app/`**)
+- **CloudFront:** Origin Path = `/det-uploader-app` → site is served at the **root** domain
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+---
 
-### `npm run build`
+## Local development
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+**Prereqs:** Node.js + npm
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+```bash
+# 1. Create your local configuration from the template
+cp .env.example .env
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+# 2. Fill in the required values in the new .env file
 
-### `npm run eject`
+# 3. Install dependencies
+npm ci
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+# 4. Start the local server
+npm start
+# The application will be running at http://localhost:3000
+````
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+---
+## Deployment
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+The application can be deployed either manually from a local machine or automatically via the CI/CD pipeline.
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+## Manual deployment
 
-## Learn More
+Requires the AWS CLI v2 to be configured with the necessary permissions.
+**macOS/Linux**
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+```bash
+export DISTRIBUTION_ID=E394LPINKP5I9U # Set the CloudFront ID to trigger a cache invalidation.
+chmod +x ./deploy.sh     # # Make the script executable (one-time setup on macOS/Linux)
+./deploy.sh
+```
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+**Windows PowerShell**
 
-### Code Splitting
+```powershell
+$env:DISTRIBUTION_ID = "E394LPINKP5I9U"  Set the CloudFront ID to trigger a cache invalidation.
+./deploy.sh
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+The script builds, syncs to `s3://crescent-react-hosting/det-uploader-app/` with proper cache headers, then invalidates `/*` on CloudFront.
 
-### Analyzing the Bundle Size
+**Verify:** open [https://det-uploader.cascadiaquakes.org/](https://det-uploader.cascadiaquakes.org/) (hard refresh if needed).
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+---
 
-### Making a Progressive Web App
+## CI/CD (GitHub Actions)
+This project is configured with an automated CI/CD pipeline using GitHub Actions. The recommended way to deploy changes is to push code to a development branch, which will trigger the automated workflow.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+**Workflow:** `.github/workflows/deploy.yml`
 
-### Advanced Configuration
+**Triggers:** Push to `main` (and `ci/cd-automation`) or manual run from the **Actions** tab.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+**What it does:** Writes a `.env` from repo Variables → `npm ci && npm run build` → runs `deploy.sh` → invalidates CloudFront.
 
-### Deployment
+*(The workflow securely authenticates to AWS using access keys stored in GitHub Secrets. It then dynamically creates a `.env` file for the build using GitHub Variables, builds the React application, and runs the `deploy.sh` script to upload the files to S3 and invalidate the CloudFront cache.)*
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+## One-Time Repository Setup (Admin Task)
 
-### `npm run build` fails to minify
+For the CI/CD pipeline to function, a repository administrator must configure the following secrets and variables.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+### Required Configuration
+
+**1. Repository Secrets (Encrypted)**
+These are used to securely authenticate the workflow to AWS:
+* `AWS_ACCESS_KEY_ID`
+* `AWS_SECRET_ACCESS_KEY`
+
+### 2. Repository Variables (Plaintext)
+
+These provide the non-secret configuration needed for the application build and deployment script. **Names must match exactly.** An admin must retrieve the correct, current values from the AWS account.
+
+* `AWS_REGION` = `us-west-2`
+* `S3_BUCKET` = `crescent-react-hosting`
+* `S3_PREFIX` = `det-uploader-app`
+* `CF_DISTRIBUTION_ID` = `<your_cloudfront_distribution_id>`
+* `REACT_APP_AWS_REGION` = `us-west-2`
+* `REACT_APP_S3_TMP_NAME` = `<your_tmp_bucket_name>`
+* `REACT_APP_S3_PROD_NAME` = `<your_prod_bucket_name>`
+* `REACT_APP_AWS_USER_POOL_ID` = `<your_user_pool_id>`
+* `REACT_APP_AWS_WEB_CLIENT_ID` = `<your_user_pool_client_id>`
+* `REACT_APP_AWS_IDENTITY_POOL_ID` = `<your_identity_pool_id>`
+* `REACT_APP_COGNITO_DOMAIN` = `<your_cognito_domain>`
+* `REACT_APP_API_URL` = `<your_api_gateway_base_url>`
+
+### Step-by-Step Setup Instructions
+
+1. **Navigate to Repository Settings**
+   - Go to your GitHub repository
+   - Click on **Settings** tab
+   - In the left sidebar, click **Secrets and variables**
+   - Click **Actions**
+
+2. **Add Repository Secrets**
+   - Click **New repository secret**
+   - Name: `AWS_ACCESS_KEY_ID` | Value: [Your AWS Access Key ID] | Click **Add secret**
+   - Click **New repository secret**
+   - Name: `AWS_SECRET_ACCESS_KEY` | Value: [Your AWS Secret Access Key] | Click **Add secret**
+
+3. **Switch to Variables Tab**
+   - Click on the **Variables** tab (next to Secrets)
+
+4. **Add Repository Variables**
+   - Click **New repository variable**
+   - Enter the Name and Value for each variable listed in section 2 above
+   - Click **Add variable**
+   - Repeat this process for all 12 variables
+
+5. **Verify Setup**
+   - You should now see 2 secrets in the **Secrets** tab
+   - You should see 12 variables in the **Variables** tab
+   - All variable names must match exactly as shown above
+
+*Note: Only repository administrators can configure secrets and variables. These values are used by the GitHub Actions workflow to authenticate with AWS and configure the application build.*
+
+> These are the **current dev values**; update if infrastructure changes.
+
+### Deploy via CI/CD
+
+```bash
+git push origin main           # or: git push origin ci/cd-automation
+# then watch Actions → "Deploy DET File Manager"
+```
+
+---
+
+## Troubleshooting
+
+* **Auth errors:** Ensure all `REACT_APP_*` variables are set (locally or in repo Variables) and rebuild.
+* **AccessDenied from site:** CloudFront ↔ S3 OAC/policy mismatch—fix in AWS console.
+* **Not seeing changes:** Confirm workflow succeeded and invalidation completed; hard refresh.
+
+---
+
+---
+
+## Future Security Improvements
+
+The current pipeline uses long-lived AWS access keys stored as GitHub Secrets. This is a secure and effective method. A future enhancement would be to migrate to **OpenID Connect (OIDC)**. This would establish a direct, keyless trust relationship between GitHub and AWS, further enhancing security by using short-lived, temporary credentials for each deployment.
+
+**Additional Planned Enhancements:**
+
+* **Automated Testing:** Add basic tests (e.g., `npm test --watchAll=false`) before deployment
+* **Environment Management:** Split environments (dev/staging/prod) with separate CloudFront distributions or S3 prefixes and per-environment variables
+
+---
