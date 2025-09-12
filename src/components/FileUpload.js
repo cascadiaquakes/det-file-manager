@@ -24,7 +24,6 @@ function FileUpload({user_metadata}) {
                 path: 'upload/',
                 options: {
                     listAll: true,
-                    bucket: 'det-bucket',
                     level: 'protected',
                 },
             });

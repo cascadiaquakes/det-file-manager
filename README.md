@@ -94,7 +94,6 @@ These provide the non-secret configuration needed for the application build and 
 * `S3_PREFIX` = `det-uploader-app`
 * `CF_DISTRIBUTION_ID` = `<your_cloudfront_distribution_id>`
 * `REACT_APP_AWS_REGION` = `us-west-2`
-* `REACT_APP_S3_TMP_NAME` = `<your_tmp_bucket_name>`
 * `REACT_APP_S3_PROD_NAME` = `<your_prod_bucket_name>`
 * `REACT_APP_AWS_USER_POOL_ID` = `<your_user_pool_id>`
 * `REACT_APP_AWS_WEB_CLIENT_ID` = `<your_user_pool_client_id>`
