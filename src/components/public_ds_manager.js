@@ -57,7 +57,6 @@ function FileManager({user_metadata}) {
                 path: `public_ds/${selectedBenchmarkId}/`,
                 options: {
                     listAll: true,
-                    bucket: 'det-bucket',
                 },
             });
             // Initialize an empty folder list
@@ -72,12 +71,9 @@ function FileManager({user_metadata}) {
                     try {
                         // Fetch only the metadata of the file
                         const response = await getProperties({
-                                path: metadataFile.path,
-                                   options:{
-                                                bucket: 'det-bucket',
-                                            }
+                                path: metadataFile.path
                         });
-                        // // Check if the userId matches the current user's sub
+                        // Check if the userId matches the current user's sub
                         if (response.metadata && response.metadata.userid === user_metadata.sub) {
                             const folderName = metadataFile.path.split('/')[2]; // Extract folder name
                             filteredFolderSet.add(folderName);
@@ -114,11 +110,12 @@ function FileManager({user_metadata}) {
                     path: folderPath,
                     options: {
                         listAll: true,
-                        bucket: 'det-bucket',
                     },
                 });
                 const deletePromises = result.items.map(item => {
-                    return remove({path: item.path, bucket: 'det-bucket'});
+                    return remove({
+                        path: item.path,
+                    });
                 });
 
                 // Delete all objects in the folder

@@ -178,9 +178,6 @@ function FileUpload({user_metadata}) {
                         path={`upload/${selectedBenchmarkId}/`}
                         maxFileCount={1}
                         processFile={processFile}
-                        providerOptions={{
-                            bucket: 'det-bucket'
-                        }}
                         isDisabled={!termsAccepted}
                         onUploadSuccess={async (event) => {
                             console.log('Upload success:', event);
