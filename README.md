@@ -85,20 +85,22 @@ These are used to securely authenticate the workflow to AWS:
 * `AWS_ACCESS_KEY_ID`
 * `AWS_SECRET_ACCESS_KEY`
 
-**2. Repository Variables (Plaintext)**
-These provide the non-secret configuration needed for the application build and deployment script. The names must match exactly:
+### 2. Repository Variables (Plaintext)
+
+These provide the non-secret configuration needed for the application build and deployment script. **Names must match exactly.** An admin must retrieve the correct, current values from the AWS account.
+
 * `AWS_REGION` = `us-west-2`
 * `S3_BUCKET` = `crescent-react-hosting`
 * `S3_PREFIX` = `det-uploader-app`
-* `CF_DISTRIBUTION_ID` = `E394LPINKP5I9U`
+* `CF_DISTRIBUTION_ID` = `<your_cloudfront_distribution_id>`
 * `REACT_APP_AWS_REGION` = `us-west-2`
-* `REACT_APP_S3_TMP_NAME` = `benchmark-vv-tmp-upload`
-* `REACT_APP_S3_PROD_NAME` = `benchmark-vv-data`
-* `REACT_APP_AWS_USER_POOL_ID` = `us-west-2_YNzWYzfgv`
-* `REACT_APP_AWS_WEB_CLIENT_ID` = `2qpe5bkvi17mdbjfqlp8id6ckl`
-* `REACT_APP_AWS_IDENTITY_POOL_ID` = `us-west-2:73562a42-3f5b-45c6-8640-22361d0775f0`
-* `REACT_APP_COGNITO_DOMAIN` = `det-benchmark.auth.us-west-2.amazoncognito.com`
-* `REACT_APP_API_URL` = `https://wkyaxkk8p7.execute-api.us-west-2.amazonaws.com/prod`
+* `REACT_APP_S3_TMP_NAME` = `<your_tmp_bucket_name>`
+* `REACT_APP_S3_PROD_NAME` = `<your_prod_bucket_name>`
+* `REACT_APP_AWS_USER_POOL_ID` = `<your_user_pool_id>`
+* `REACT_APP_AWS_WEB_CLIENT_ID` = `<your_user_pool_client_id>`
+* `REACT_APP_AWS_IDENTITY_POOL_ID` = `<your_identity_pool_id>`
+* `REACT_APP_COGNITO_DOMAIN` = `<your_cognito_domain>`
+* `REACT_APP_API_URL` = `<your_api_gateway_base_url>`
 
 ### Step-by-Step Setup Instructions
 
