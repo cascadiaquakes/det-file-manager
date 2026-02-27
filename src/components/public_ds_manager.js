@@ -1,102 +1,123 @@
 import React, { useState, useEffect } from 'react';
 import { Form, Button, Container, Alert, ListGroup, Spinner } from 'react-bootstrap';
-import { list, remove, getProperties } from 'aws-amplify/storage';
+import { list, remove, getProperties, downloadData } from 'aws-amplify/storage';
 
-function FileManager({user_metadata}) {
+function FileManager({ user_metadata }) {
     const [benchmarkIds, setBenchmarkIds] = useState([]);
     const [selectedBenchmarkId, setSelectedBenchmarkId] = useState('');
     const [folders, setFolders] = useState([]);
     const [deleteError, setDeleteError] = useState(null);
     const [deleteSuccess, setDeleteSuccess] = useState(false);
-    const [loading, setLoading] = useState(false); // Track if data is being loaded or deleted
+    const [loading, setLoading] = useState(false);
 
-    // Fetch benchmark IDs using the list method
+    // 1) Fetch benchmark IDs from manifest (no listAll crawl)
     const getBenchmarkIds = async () => {
         try {
-            const result = await list({
-                path: 'public_ds/', // Root path for the bucket
-                options: {
-                    listAll: true, // List all items
-                    level: 'protected',
-                },
-            });
-            const items = result.items || []; // Fallback to an empty array if items is undefined
-            // Extract unique folder names (benchmark IDs)
-            const ids = items
-                .filter(item => item.path && item.path.endsWith('/'))
-                .map(item => {
-                    const parts = item.path.split('/');
-                    // parts[0] = 'upload', parts[1] = folderName, parts[2] = '' (if it ends with '/')
-                    return parts[1];
-                })
-                .filter(id => id.trim() !== '');
+            setLoading(true);
 
-            setBenchmarkIds([...new Set(ids)]); // Remove duplicates
+            const { body } = await downloadData({
+                path: 'public_ds/benchmarks_list.json',
+                options: { level: 'protected' },
+            }).result;
+
+            const manifest = JSON.parse(await body.text());
+
+            const publicGroup = manifest?.groups?.public;
+            if (!Array.isArray(publicGroup)) {
+                throw new Error('benchmarks_list.json missing groups.public array');
+            }
+
+            const ids = publicGroup
+                .map((b) => (typeof b?.id === 'string' ? b.id.trim() : ''))
+                .filter(Boolean);
+
+            const unique = [...new Set(ids)];
+            setBenchmarkIds(unique);
+
+            // If nothing selected yet, default to first benchmark
+            setSelectedBenchmarkId((prev) => prev || unique[0] || '');
         } catch (error) {
-            console.error('Error fetching benchmark IDs:', error?.name || error?.message);
+            console.error('Error fetching benchmark IDs (manifest):', error?.name || error?.message || error);
+            setDeleteError('Failed to load benchmark list.');
+        } finally {
+            setLoading(false);
         }
     };
 
     useEffect(() => {
         getBenchmarkIds();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Fetch benchmark ids (folders) from S3 for the file manager bucket
+    // 2) Fetch user-owned folders under selected benchmark
     useEffect(() => {
+        let cancelled = false;
+
         const fetchFolders = async () => {
-        if (!selectedBenchmarkId) {
-            setFolders([]); // Reset folders if no benchmark is selected
-            return;
-        }
+            if (!selectedBenchmarkId) {
+                setFolders([]);
+                return;
+            }
 
-        try {
-            setLoading(true);
+            try {
+                setLoading(true);
 
-            // List all items in the benchmark folder
-            const result = await list({
-                path: `public_ds/${selectedBenchmarkId}/`,
-                options: {
-                    listAll: true,
-                },
-            });
-            // Initialize an empty folder list
-            const filteredFolderSet = new Set();
+                const result = await list({
+                    path: `public_ds/${selectedBenchmarkId}/`,
+                    options: {
+                        listAll: true,
+                        level: 'protected',
+                    },
+                });
 
-            // Filter items to process only `metadata.json` files
-            const metadataFiles = result.items.filter((item) => item.path.endsWith('metadata.json'));
+                const items = result.items || [];
 
-            // Fetch metadata for each `metadata.json` file
-            await Promise.all(
-                metadataFiles.map(async (metadataFile) => {
-                    try {
-                        // Fetch only the metadata of the file
-                        const response = await getProperties({
-                                path: metadataFile.path
-                        });
-                        // Check if the userId matches the current user's sub
-                        if (response.metadata && response.metadata.userid === user_metadata.sub) {
-                            const folderName = metadataFile.path.split('/')[2]; // Extract folder name
-                            filteredFolderSet.add(folderName);
+                // Only look at metadata.json files
+                const metadataFiles = items.filter((item) => item.path && item.path.endsWith('metadata.json'));
+
+                const filteredFolderSet = new Set();
+
+                await Promise.all(
+                    metadataFiles.map(async (metadataFile) => {
+                        try {
+                            const response = await getProperties({
+                                path: metadataFile.path,
+                                options: { level: 'protected' },
+                            });
+
+                            if (response?.metadata?.userid === user_metadata.sub) {
+                                // public_ds/<benchmarkId>/<folderName>/metadata.json
+                                const parts = metadataFile.path.split('/');
+                                const folderName = parts[2];
+                                if (folderName) filteredFolderSet.add(folderName);
+                            }
+                        } catch (error) {
+                            console.warn(
+                                `Error fetching properties for ${metadataFile.path}:`,
+                                error?.name || error?.message || error
+                            );
                         }
-                    } catch (error) {
-                        console.warn(`Error fetching metadata for ${metadataFile.path}:`, error?.name || error?.message);
-                    }
-                })
-            );
+                    })
+                );
 
-            // Convert the filtered folder set to an array and update the state
-            setFolders(Array.from(filteredFolderSet));
-        } catch (error) {
-            console.error('Error fetching folders:', error?.name || error?.message);
-        } finally {
-            setLoading(false);
-        }
-    };
-    fetchFolders();
-    }, [selectedBenchmarkId]);
+                if (!cancelled) setFolders(Array.from(filteredFolderSet));
+            } catch (error) {
+                console.error('Error fetching folders:', error?.name || error?.message || error);
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        };
+
+        fetchFolders();
+        return () => {
+            cancelled = true;
+        };
+    }, [selectedBenchmarkId, user_metadata.sub]);
 
     // Handle deletion of a folder
     const handleDeleteFolder = async (folderName) => {
+        if (!selectedBenchmarkId || !folderName) return;
+
         if (window.confirm(`Are you sure you want to delete the folder "${folderName}" and its contents?`)) {
             try {
                 setLoading(true);
@@ -105,28 +126,30 @@ function FileManager({user_metadata}) {
 
                 const folderPath = `public_ds/${selectedBenchmarkId}/${folderName}/`;
 
-                // List all objects in the folder to delete
                 const result = await list({
                     path: folderPath,
                     options: {
                         listAll: true,
+                        level: 'protected',
                     },
                 });
-                const deletePromises = result.items.map(item => {
-                    return remove({
-                        path: item.path,
-                    });
-                });
 
-                // Delete all objects in the folder
-                await Promise.all(deletePromises);
+                const items = result.items || [];
+
+                await Promise.all(
+                    items.map((item) =>
+                        remove({
+                            path: item.path,
+                            options: { level: 'protected' },
+                        })
+                    )
+                );
 
                 setDeleteSuccess(true);
-                // Refresh the folders list after deletion
-                setFolders(folders.filter(folder => folder !== folderName));
+                setFolders((prev) => prev.filter((f) => f !== folderName));
             } catch (error) {
-                console.error('Error deleting folder:', error?.name || error?.message);
-                setDeleteError(error.message || 'Failed to delete folder.');
+                console.error('Error deleting folder:', error?.name || error?.message || error);
+                setDeleteError(error?.message || 'Failed to delete folder.');
             } finally {
                 setLoading(false);
             }
@@ -143,10 +166,11 @@ function FileManager({user_metadata}) {
         <Container className="mt-4">
             {deleteSuccess && <Alert variant="success">Folder deleted successfully!</Alert>}
             {deleteError && <Alert variant="danger">Error: {deleteError}</Alert>}
+
             <h2>File management</h2>
             <p>Here you can manage your previous uploads</p>
+
             <Form>
-                {/* Benchmark ID Selector */}
                 <Form.Group controlId="formBenchmarkId" className="mb-3">
                     <Form.Label>Select Benchmark ID</Form.Label>
                     <Form.Control as="select" value={selectedBenchmarkId} onChange={handleBenchmarkChange}>
@@ -163,21 +187,16 @@ function FileManager({user_metadata}) {
             <h4>Folders under "{selectedBenchmarkId}"</h4>
 
             {loading ? (
-                <Spinner animation="border" role="status"/>
+                <Spinner animation="border" role="status" />
             ) : (
                 <ListGroup>
                     {folders.length === 0 ? (
                         <ListGroup.Item>No folders available under this benchmark.</ListGroup.Item>
                     ) : (
                         folders.map((folder) => (
-                            <ListGroup.Item key={folder}>
-                                {folder}
-                                <Button
-                                    variant="danger"
-                                    size="sm"
-                                    className="ml-2"
-                                    onClick={() => handleDeleteFolder(folder)}
-                                >
+                            <ListGroup.Item key={folder} className="d-flex justify-content-between align-items-center">
+                                <span>{folder}</span>
+                                <Button variant="danger" size="sm" onClick={() => handleDeleteFolder(folder)}>
                                     Delete
                                 </Button>
                             </ListGroup.Item>
