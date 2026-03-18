@@ -2,7 +2,7 @@
 
 on:
   push:
-    branches: [main, ci/cd-automation]
+    branches: [master, ci/cd-automation]
   workflow_dispatch: {}
 
 permissions:
