@@ -18,21 +18,22 @@ Static site (React + Vite) built, uploaded to **S3**, and served via **CloudFron
 
 ## Local development
 
-**Prereqs:** Node.js + npm
+**Prereqs:** Node.js 20+ and npm.
 
 ```bash
 # 1. Create your local configuration from the template
 cp .env.example .env
 
-# 2. Fill in the required values in the new .env file
+# 2. Fill in the required values in the new .env file (see the variable
+#    list in "One-Time Repository Setup" below — same names locally)
 
 # 3. Install dependencies
 npm ci
 
-# 4. Start the local server
+# 4. Start the local dev server (Vite, with HMR)
 npm start
 # The application will be running at http://localhost:3000
-````
+```
 
 ---
 ## Deployment
@@ -64,13 +65,14 @@ The script builds, syncs to `s3://crescent-react-hosting/det-uploader-app/` with
 ---
 
 ## CI/CD (GitHub Actions)
-This project is configured with an automated CI/CD pipeline using GitHub Actions. The recommended way to deploy changes is to push code to a development branch, which will trigger the automated workflow.
 
-**Workflow:** `.github/workflows/deploy.yml`
+Two workflows:
 
-**Triggers:** Push to `master` or manual run from the **Actions** tab.
+**`.github/workflows/ci.yml`** runs on every PR. Does `npm ci`, `npm run build`, `npm audit`, and a `gitleaks` secret scan. Has to pass before the PR can merge.
 
-**What it does:** Authenticates to AWS via OIDC → writes a `.env` from repo Variables → `npm ci && npm run build` → runs `deploy.sh` → syncs `dist/` to S3 → invalidates CloudFront.
+**`.github/workflows/deploy.yml`** runs on push to `master` (and on manual dispatch). Authenticates to AWS via OIDC, writes a `.env` from repo Variables, runs `deploy.sh`, syncs `dist/` to S3, invalidates CloudFront.
+
+Day-to-day flow: open a PR, let CI go green, merge to master, deploy runs.
 
 ## One-Time Repository Setup (Admin Task)
 
@@ -122,8 +124,6 @@ These provide the non-secret configuration needed for the application build and 
 
 *Note: Only repository administrators can configure secrets and variables. These values are used by the GitHub Actions workflow to authenticate with AWS and configure the application build.*
 
-> These are the **current dev values**; update if infrastructure changes.
-
 ### Deploy via CI/CD
 
 ```bash
@@ -141,15 +141,18 @@ git push origin master
 
 ---
 
----
+## Repo hygiene
 
-## Future Security Improvements
+A few things to know about how this repo is wired up:
 
-The current pipeline uses long-lived AWS access keys stored as GitHub Secrets. This is a secure and effective method. A future enhancement would be to migrate to **OpenID Connect (OIDC)**. This would establish a direct, keyless trust relationship between GitHub and AWS, further enhancing security by using short-lived, temporary credentials for each deployment.
+* **Master is protected.** No direct pushes — every change goes through a PR with at least one approving review. Force pushes and branch deletion are blocked.
+* **CI runs on every PR** (`.github/workflows/ci.yml`): build smoke test, `npm audit`, and a `gitleaks` secret scan. PR can't merge unless this passes.
+* **Deploy runs on push to master** (`.github/workflows/deploy.yml`) and authenticates to AWS via OIDC — no long-lived keys in the repo.
+* **npm audit is currently informational.** When the Amplify dep tree ships fewer vulns we can flip `continue-on-error: false` so new vulns actually gate the PR.
 
-**Additional Planned Enhancements:**
+## What's still on the list
 
-* **Automated Testing:** Add basic tests (e.g., `npm test --watchAll=false`) before deployment
-* **Environment Management:** Split environments (dev/staging/prod) with separate CloudFront distributions or S3 prefixes and per-environment variables
+* **Dev/prod environment separation.** This repo only has a production target right now. A `dev` branch + second CloudFront distribution would let us test risky changes against `https://dev-det-uploader.cascadiaquakes.org/` (or similar) before they hit production. The OIDC trust policy already includes `repo:cascadiaquakes/det-file-manager:ref:refs/heads/dev` so the AWS side is pre-wired.
+* **Unit / integration tests.** None yet. A `npm test` step would give the CI workflow more to do than just compile-check.
 
 ---
