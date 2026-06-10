@@ -5,6 +5,9 @@ import react from '@vitejs/plugin-react'
 // (a CRA convention), so we tell esbuild to parse .js as JSX too.
 export default defineConfig({
   plugins: [react()],
+  // Relative base so the same build works at both the prod root
+  // (/) and the dev path (/dev/) without a per-environment rebuild.
+  base: './',
   esbuild: {
     loader: 'jsx',
     include: /src\/.*\.(js|jsx)$/,
