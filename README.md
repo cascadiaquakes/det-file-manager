@@ -9,7 +9,7 @@ React frontend for the DET uploader.
 
 ## Architecture
 
-Static site (Create React App) built, uploaded to **S3**, and served via **CloudFront**.
+Static site (React + Vite) built, uploaded to **S3**, and served via **CloudFront**.
 
 - **S3 bucket:** `crescent-react-hosting` (prefix **`det-uploader-app/`**)
 - **CloudFront:** Origin Path = `/det-uploader-app` → site is served at the **root** domain
@@ -68,11 +68,9 @@ This project is configured with an automated CI/CD pipeline using GitHub Actions
 
 **Workflow:** `.github/workflows/deploy.yml`
 
-**Triggers:** Push to `main` (and `ci/cd-automation`) or manual run from the **Actions** tab.
+**Triggers:** Push to `master` or manual run from the **Actions** tab.
 
-**What it does:** Writes a `.env` from repo Variables → `npm ci && npm run build` → runs `deploy.sh` → invalidates CloudFront.
-
-*(The workflow securely authenticates to AWS using access keys stored in GitHub Secrets. It then dynamically creates a `.env` file for the build using GitHub Variables, builds the React application, and runs the `deploy.sh` script to upload the files to S3 and invalidate the CloudFront cache.)*
+**What it does:** Authenticates to AWS via OIDC → writes a `.env` from repo Variables → `npm ci && npm run build` → runs `deploy.sh` → syncs `dist/` to S3 → invalidates CloudFront.
 
 ## One-Time Repository Setup (Admin Task)
 
@@ -80,10 +78,9 @@ For the CI/CD pipeline to function, a repository administrator must configure th
 
 ### Required Configuration
 
-**1. Repository Secrets (Encrypted)**
-These are used to securely authenticate the workflow to AWS:
-* `AWS_ACCESS_KEY_ID`
-* `AWS_SECRET_ACCESS_KEY`
+**1. AWS authentication (OIDC)**
+
+The workflow assumes `arn:aws:iam::818214664804:role/GitHubActionsDeployRole` via OpenID Connect — no long-lived access keys in the repo. The role's trust policy must include `repo:cascadiaquakes/det-file-manager:ref:refs/heads/<branch>` for any branch you want to deploy from.
 
 ### 2. Repository Variables (Plaintext)
 
@@ -93,13 +90,13 @@ These provide the non-secret configuration needed for the application build and 
 * `S3_BUCKET` = `crescent-react-hosting`
 * `S3_PREFIX` = `det-uploader-app`
 * `CF_DISTRIBUTION_ID` = `<your_cloudfront_distribution_id>`
-* `REACT_APP_AWS_REGION` = `us-west-2`
-* `REACT_APP_S3_PROD_NAME` = `<your_prod_bucket_name>`
-* `REACT_APP_AWS_USER_POOL_ID` = `<your_user_pool_id>`
-* `REACT_APP_AWS_WEB_CLIENT_ID` = `<your_user_pool_client_id>`
-* `REACT_APP_AWS_IDENTITY_POOL_ID` = `<your_identity_pool_id>`
-* `REACT_APP_COGNITO_DOMAIN` = `<your_cognito_domain>`
-* `REACT_APP_API_URL` = `<your_api_gateway_base_url>`
+* `VITE_AWS_REGION` = `us-west-2`
+* `VITE_S3_PROD_NAME` = `<your_prod_bucket_name>`
+* `VITE_AWS_USER_POOL_ID` = `<your_user_pool_id>`
+* `VITE_AWS_WEB_CLIENT_ID` = `<your_user_pool_client_id>`
+* `VITE_AWS_IDENTITY_POOL_ID` = `<your_identity_pool_id>`
+* `VITE_COGNITO_DOMAIN` = `<your_cognito_domain>`
+* `VITE_API_URL` = `<your_api_gateway_base_url>`
 
 ### Step-by-Step Setup Instructions
 
@@ -109,24 +106,18 @@ These provide the non-secret configuration needed for the application build and 
    - In the left sidebar, click **Secrets and variables**
    - Click **Actions**
 
-2. **Add Repository Secrets**
-   - Click **New repository secret**
-   - Name: `AWS_ACCESS_KEY_ID` | Value: [Your AWS Access Key ID] | Click **Add secret**
-   - Click **New repository secret**
-   - Name: `AWS_SECRET_ACCESS_KEY` | Value: [Your AWS Secret Access Key] | Click **Add secret**
-
-3. **Switch to Variables Tab**
+2. **Switch to Variables Tab**
    - Click on the **Variables** tab (next to Secrets)
 
-4. **Add Repository Variables**
+3. **Add Repository Variables**
    - Click **New repository variable**
    - Enter the Name and Value for each variable listed in section 2 above
    - Click **Add variable**
-   - Repeat this process for all 12 variables
+   - Repeat for all 11 variables
 
-5. **Verify Setup**
-   - You should now see 2 secrets in the **Secrets** tab
-   - You should see 12 variables in the **Variables** tab
+4. **Verify Setup**
+   - You should see 11 variables in the **Variables** tab
+   - The **Secrets** tab should not contain `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` — auth is via OIDC
    - All variable names must match exactly as shown above
 
 *Note: Only repository administrators can configure secrets and variables. These values are used by the GitHub Actions workflow to authenticate with AWS and configure the application build.*
@@ -136,7 +127,7 @@ These provide the non-secret configuration needed for the application build and 
 ### Deploy via CI/CD
 
 ```bash
-git push origin main           # or: git push origin ci/cd-automation
+git push origin master
 # then watch Actions → "Deploy DET File Manager"
 ```
 
@@ -144,7 +135,7 @@ git push origin main           # or: git push origin ci/cd-automation
 
 ## Troubleshooting
 
-* **Auth errors:** Ensure all `REACT_APP_*` variables are set (locally or in repo Variables) and rebuild.
+* **Auth errors:** Ensure all `VITE_*` variables are set (locally or in repo Variables) and rebuild.
 * **AccessDenied from site:** CloudFront ↔ S3 OAC/policy mismatch—fix in AWS console.
 * **Not seeing changes:** Confirm workflow succeeded and invalidation completed; hard refresh.
 

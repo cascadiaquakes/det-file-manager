@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deploy the DET File Manager (CRA) to S3 (+ optional CloudFront invalidate)
+# Deploy the DET File Manager (Vite) to S3 (+ optional CloudFront invalidate)
 
 set -euo pipefail
 
@@ -13,31 +13,31 @@ DISTRIBUTION_ID="${DISTRIBUTION_ID:-}"  # optional; set env var to invalidate CF
 command -v aws >/dev/null  || { echo "ERROR: aws CLI v2 required"; exit 1; }
 command -v npm >/dev/null  || { echo "ERROR: npm required"; exit 1; }
 
-echo "Deploying build/ to s3://${BUCKET}/${PREFIX}/ (region ${REGION})"
+echo "Deploying dist/ to s3://${BUCKET}/${PREFIX}/ (region ${REGION})"
 echo "CloudFront root (/) should map to s3://${BUCKET}/${PREFIX}/ via Origin path."
 
-# Load CRA env vars for local/manual runs (CI writes .env before calling this)
+# Load Vite env vars for local/manual runs (CI writes .env before calling this)
 if [[ -f .env ]]; then
-  echo "Loading .env (CRA build-time variables)…"
+  echo "Loading .env (Vite build-time variables)…"
   set -o allexport
   # shellcheck disable=SC1091
   source .env
   set +o allexport
 fi
 
-# 1) Install deps and build (CRA uses package.json: homepage="/")
+# 1) Install deps and build
 npm ci
 npm run build
 
 # 2) Push static assets (hashed filenames) with long cache
-aws s3 sync build/ "s3://${BUCKET}/${PREFIX}/" \
+aws s3 sync dist/ "s3://${BUCKET}/${PREFIX}/" \
   --region "${REGION}" \
   --exclude "index.html" \
   --cache-control "public,max-age=31536000,immutable" \
   --delete
 
 # 3) Push index.html with no cache so users always get the latest shell
-aws s3 cp build/index.html "s3://${BUCKET}/${PREFIX}/index.html" \
+aws s3 cp dist/index.html "s3://${BUCKET}/${PREFIX}/index.html" \
   --region "${REGION}" \
   --content-type "text/html" \
   --cache-control "no-cache,must-revalidate,public,max-age=0" \

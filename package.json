@@ -2,34 +2,28 @@
   "name": "det_file_uploader",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "homepage": "/",
   "dependencies": {
     "@aws-amplify/storage": "^6.7.1",
     "@aws-amplify/ui-react": "^6.7.1",
     "@aws-amplify/ui-react-storage": "^3.5.0",
-    "@testing-library/jest-dom": "^5.17.0",
-    "@testing-library/react": "^13.4.0",
-    "@testing-library/user-event": "^13.5.0",
     "aws-amplify": "^6.10.2",
     "bootstrap": "^5.3.3",
-    "dotenv": "^16.4.5",
     "react": "^18.3.1",
     "react-bootstrap": "^2.10.5",
     "react-dom": "^18.3.1",
-    "react-scripts": "^5.0.1",
     "web-vitals": "^2.1.4"
   },
-  "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^5.4.10"
   },
-  "eslintConfig": {
-    "extends": [
-      "react-app",
-      "react-app/jest"
-    ]
+  "scripts": {
+    "start": "vite",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
   },
   "browserslist": {
     "production": [

@@ -58,7 +58,7 @@ function FileUpload({user_metadata}) {
         const intervalId = setInterval(async () => {
             try {
                 // Create URL object to handle parameters
-                const url = new URL(`${process.env.REACT_APP_API_URL}/status`);
+                const url = new URL(`${import.meta.env.VITE_API_URL}/status`);
                 url.searchParams.append('userId', userId);
                 url.searchParams.append('fileId', fileId);
 
