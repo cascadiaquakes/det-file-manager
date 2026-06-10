@@ -73,7 +73,7 @@ The script builds, syncs to `s3://crescent-react-hosting/det-uploader-app/` with
 
 Three workflows:
 
-**`.github/workflows/ci.yml`** runs on every PR. Does `npm ci`, `npm run build`, `npm audit`, and a `gitleaks` secret scan. Has to pass before the PR can merge. `npm audit` is currently informational; flip `continue-on-error: false` when the Amplify dep tree ships fewer vulns and new vulns should actually gate the PR.
+**`.github/workflows/ci.yml`** runs on every PR. Does `npm ci`, `npm test` (Vitest), `npm run build`, `npm audit`, and a `gitleaks` secret scan. Has to pass before the PR can merge. `npm audit` is currently informational; flip `continue-on-error: false` when the Amplify dep tree ships fewer vulns and new vulns should actually gate the PR.
 
 **`.github/workflows/deploy.yml`** runs on push to `master`. Deploys to the prod prefix `s3://crescent-react-hosting/det-uploader-app/`, served at `det-uploader.cascadiaquakes.org/`. Invalidates the whole distribution.
 
@@ -134,7 +134,7 @@ Only repository administrators can configure variables. These values are read by
 
 ## What's still on the list
 
-* **Unit / integration tests.** None yet. A `npm test` step would give the CI workflow more to do than just compile-check.
+* **More test coverage.** We have a Vitest smoke suite (`npm test`) that proves the app compiles and the Amplify sign-in screen renders. Component-level and authenticated-flow tests would need Amplify auth mocking, which we haven't taken on yet.
 * **Fully isolated dev backend.** The dev environment currently shares the prod Cognito pool, S3 bucket and API. That's fine for previewing UI changes, but a dev user can still write real files to prod storage. A proper split would need a dev Cognito pool, a dev S3 bucket and a dev API stack, which is a backend coordination ask.
 
 ---
