@@ -3,7 +3,8 @@
 
 React frontend for the DET uploader.
 
-**Live:** https://det-uploader.cascadiaquakes.org/
+**Prod:** https://det-uploader.cascadiaquakes.org/
+**Dev:**  https://det-uploader.cascadiaquakes.org/dev/ — same backend, used to preview UI changes before they reach prod
 
 ---
 
@@ -66,13 +67,15 @@ The script builds, syncs to `s3://crescent-react-hosting/det-uploader-app/` with
 
 ## CI/CD (GitHub Actions)
 
-Two workflows:
+Three workflows:
 
 **`.github/workflows/ci.yml`** runs on every PR. Does `npm ci`, `npm run build`, `npm audit`, and a `gitleaks` secret scan. Has to pass before the PR can merge.
 
-**`.github/workflows/deploy.yml`** runs on push to `master` (and on manual dispatch). Authenticates to AWS via OIDC, writes a `.env` from repo Variables, runs `deploy.sh`, syncs `dist/` to S3, invalidates CloudFront.
+**`.github/workflows/deploy.yml`** runs on push to `master`. Deploys to the prod prefix `s3://crescent-react-hosting/det-uploader-app/`, served at `det-uploader.cascadiaquakes.org/`. Invalidates the whole distribution.
 
-Day-to-day flow: open a PR, let CI go green, merge to master, deploy runs.
+**`.github/workflows/deploy-dev.yml`** runs on push to `dev`. Deploys to `s3://crescent-react-hosting/det-uploader-app/dev/`, served at `det-uploader.cascadiaquakes.org/dev/`. Only invalidates `/dev/*`, leaves prod cache alone.
+
+Day-to-day flow: open a PR to `dev` → CI runs → merge to `dev` → preview at the dev URL. When happy, open a PR `dev → master` → merge → goes to prod.
 
 ## One-Time Repository Setup (Admin Task)
 
@@ -152,7 +155,7 @@ A few things to know about how this repo is wired up:
 
 ## What's still on the list
 
-* **Dev/prod environment separation.** This repo only has a production target right now. A `dev` branch + second CloudFront distribution would let us test risky changes against `https://dev-det-uploader.cascadiaquakes.org/` (or similar) before they hit production. The OIDC trust policy already includes `repo:cascadiaquakes/det-file-manager:ref:refs/heads/dev` so the AWS side is pre-wired.
 * **Unit / integration tests.** None yet. A `npm test` step would give the CI workflow more to do than just compile-check.
+* **Fully isolated dev backend.** The dev environment currently shares the prod Cognito pool, S3 bucket and API. That's fine for previewing UI changes, but a dev user can still write real files to prod storage. A proper split would need a dev Cognito pool + dev S3 bucket + dev API stack, which is a backend coordination ask.
 
 ---
