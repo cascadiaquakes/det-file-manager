@@ -3,7 +3,6 @@ import { Form, Container, Alert, Spinner, Modal, Button } from 'react-bootstrap'
 import { list } from 'aws-amplify/storage';
 import { StorageManager } from '@aws-amplify/ui-react-storage';
 import { fetchAuthSession } from 'aws-amplify/auth';
-import mockProcessingStatus from '../mocks/processingStatus.json';
 
 
 function FileUpload({user_metadata}) {
