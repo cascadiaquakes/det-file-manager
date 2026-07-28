@@ -28,18 +28,27 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build (CRA)
+      - name: Run tests
+        # Vitest smoke suite. Build-time env vars are baked at build, so the
+        # tests just need values that satisfy Amplify.configure() without
+        # actually talking to AWS.
         env:
-          # Matches deploy.yml: CRA treats warnings as errors when CI=true,
-          # and the codebase has accumulated lint warnings we don't want to
-          # gate PRs on. Tighten this when we migrate to Vite.
-          CI: ""
+          VITE_AWS_REGION: us-west-2
+          VITE_S3_PROD_NAME: ci-placeholder
+          VITE_AWS_USER_POOL_ID: us-west-2_test
+          VITE_AWS_WEB_CLIENT_ID: ci-placeholder
+          VITE_AWS_IDENTITY_POOL_ID: "us-west-2:00000000-0000-0000-0000-000000000000"
+          VITE_COGNITO_DOMAIN: ci-placeholder.example.com
+          VITE_API_URL: https://ci-placeholder.example.com
+        run: npm test
+
+      - name: Build
         run: npm run build
 
       - name: npm audit (high+)
-        # Informational until CRA -> Vite migration clears the bulk of CRA-tree
-        # vulns. The PR should fail on NEW vulns we introduce, but the existing
-        # baseline isn't something we can clear without the framework swap.
+        # Informational until the Amplify dep tree ships fewer vulns. The
+        # PR should eventually fail on NEW vulns we introduce, but the
+        # existing baseline isn't something we can clear from the app side.
         continue-on-error: true
         run: npm audit --audit-level=high
 
