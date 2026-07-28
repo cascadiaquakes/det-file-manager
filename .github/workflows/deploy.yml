@@ -2,11 +2,12 @@
 
 on:
   push:
-    branches: [main, ci/cd-automation]
+    branches: [master]
   workflow_dispatch: {}
 
 permissions:
   contents: read
+  id-token: write
 
 concurrency:
   group: deploy-${{ github.ref }}
@@ -31,29 +32,28 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "18"
+          node-version: "20"
           cache: "npm"
 
-      - name: Configure AWS credentials
+      - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region:            ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::818214664804:role/GitHubActionsDeployRole
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: gha-deploy-det-file-manager
 
-      - name: Create .env for CRA build
+      - name: Create .env for Vite build
         run: |
           cat > .env <<'EOF'
-          REACT_APP_AWS_REGION=${{ vars.REACT_APP_AWS_REGION }}
-          REACT_APP_S3_TMP_NAME=${{ vars.REACT_APP_S3_TMP_NAME }}
-          REACT_APP_S3_PROD_NAME=${{ vars.REACT_APP_S3_PROD_NAME }}
-          REACT_APP_AWS_USER_POOL_ID=${{ vars.REACT_APP_AWS_USER_POOL_ID }}
-          REACT_APP_AWS_WEB_CLIENT_ID=${{ vars.REACT_APP_AWS_WEB_CLIENT_ID }}
-          REACT_APP_AWS_IDENTITY_POOL_ID=${{ vars.REACT_APP_AWS_IDENTITY_POOL_ID }}
-          REACT_APP_COGNITO_DOMAIN=${{ vars.REACT_APP_COGNITO_DOMAIN }}
-          REACT_APP_API_URL=${{ vars.REACT_APP_API_URL }}
+          VITE_AWS_REGION=${{ vars.VITE_AWS_REGION }}
+          VITE_S3_PROD_NAME=${{ vars.VITE_S3_PROD_NAME }}
+          VITE_AWS_USER_POOL_ID=${{ vars.VITE_AWS_USER_POOL_ID }}
+          VITE_AWS_WEB_CLIENT_ID=${{ vars.VITE_AWS_WEB_CLIENT_ID }}
+          VITE_AWS_IDENTITY_POOL_ID=${{ vars.VITE_AWS_IDENTITY_POOL_ID }}
+          VITE_COGNITO_DOMAIN=${{ vars.VITE_COGNITO_DOMAIN }}
+          VITE_API_URL=${{ vars.VITE_API_URL }}
           EOF
-          echo "Wrote .env with CRA variables."
+          echo "Wrote .env with Vite variables."
 
       - name: Show target
         run: |
@@ -66,7 +66,5 @@ jobs:
         run: chmod +x ./deploy.sh
 
       - name: Build & Deploy to S3 (invalidate CloudFront)
-        env:
-          CI: ""   # CRA: don't fail build on lint warnings
         run: |
           DISTRIBUTION_ID="$CF_DISTRIBUTION_ID" ./deploy.sh

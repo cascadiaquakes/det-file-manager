@@ -59,26 +59,20 @@ function FileUpload({user_metadata}) {
     const pollProcessingStatus = (userId, fileId) => {
         const intervalId = setInterval(async () => {
             try {
-                let data;
+                // Create URL object to handle parameters
+                const url = new URL(`${import.meta.env.VITE_API_URL}/status`);
+                url.searchParams.append('userId', userId);
+                url.searchParams.append('fileId', fileId);
 
-                if (process.env.REACT_APP_USE_MOCK_PROCESSING_STATUS === 'true') {
-                    data = mockProcessingStatus;
-                } else {
-                    // Create URL object to handle parameters
-                    const url = new URL(`${process.env.REACT_APP_API_URL}/status`);
-                    url.searchParams.append('userId', userId);
-                    url.searchParams.append('fileId', fileId);
+                const token = await getAuthToken();
 
-                    const token = await getAuthToken();
-
-                    const response = await fetch(url.toString(), {
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                        }
-                    });
-                    data = await response.json();
-                }
+                const response = await fetch(url.toString(), {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                const data = await response.json();
 
                 if (data.status === 'completed') {
                     setProcessingSummary(data.summary || null);
