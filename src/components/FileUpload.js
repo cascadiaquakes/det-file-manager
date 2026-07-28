@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Form, Container, Alert, Spinner, Modal, Button } from 'react-bootstrap';
 import { list } from 'aws-amplify/storage';
 import { StorageManager } from '@aws-amplify/ui-react-storage';
-import { Amplify } from 'aws-amplify';
 import { fetchAuthSession } from 'aws-amplify/auth';
 
 
@@ -15,6 +14,8 @@ function FileUpload({user_metadata}) {
     const [loading, setLoading] = useState(false);
     const [termsAccepted, setTermsAccepted] = useState(false);
     const [showTerms, setShowTerms] = useState(false);
+    const [processingSummary, setProcessingSummary] = useState(null);
+    const [showProcessingSummary, setShowProcessingSummary] = useState(false);
 
     // Fetch benchmark IDs from the upload bucket
     const getBenchmarkIds = async () => {
@@ -71,7 +72,9 @@ function FileUpload({user_metadata}) {
                     }
                 });
                 const data = await response.json();
+
                 if (data.status === 'completed') {
+                    setProcessingSummary(data.summary || null);
                     setUploadMessage('✅ File processed successfully.');
                     clearInterval(intervalId);
                 } else if (data.status === 'failed') {
@@ -96,6 +99,8 @@ function FileUpload({user_metadata}) {
         setUploadSuccess(false);
         setUploadError(null);
         setUploadMessage('');
+        setProcessingSummary(null);
+        setShowProcessingSummary(false);
     };
 
     const processFile = async ({ file, key }) => {
@@ -139,13 +144,27 @@ function FileUpload({user_metadata}) {
             <h2>File Upload</h2>
             <p>Upload your solution as a .zip after selecting the correct benchmark. Naming convention
                 is <code>nameOfModeler_version.zip</code></p>
-            {uploadSuccess && <Alert variant="success" className="mt-3">{uploadMessage}</Alert>}
+            {uploadSuccess && (
+                <Alert variant="success" className="mt-3">
+                    <div>{uploadMessage}</div>
+                    {processingSummary && (
+                        <Button
+                            variant="outline-success"
+                            size="sm"
+                            className="mt-2"
+                            onClick={() => setShowProcessingSummary(true)}
+                        >
+                            View processing summary
+                        </Button>
+                    )}
+                </Alert>
+            )}
             {uploadError && <Alert variant="danger" className="mt-3">{uploadError}</Alert>}
             {loading && <Spinner animation="border" role="status" className="mb-3" />}
 
             <Form>
                 <Form.Group controlId="benchmarkSelect">
-                    <Form.Label>Select Benchmark ID</Form.Label>
+                    <label className="form-label" htmlFor="benchmarkSelect">Select Benchmark ID</label>
                     <Form.Control as="select" value={selectedBenchmarkId} onChange={handleBenchmarkChange}>
                         <option value="">-- Select a Benchmark --</option>
                         {benchmarkIds.map((id, index) => (
@@ -163,7 +182,15 @@ function FileUpload({user_metadata}) {
                         onChange={(e) => setTermsAccepted(e.target.checked)}
                         label={
                             <span>
-                                I accept the <a href="#" onClick={handleTermsClick}>Terms and Conditions</a>
+                                I accept the{' '}
+                                <Button
+                                    type="button"
+                                    variant="link"
+                                    className="p-0 align-baseline"
+                                    onClick={handleTermsClick}
+                                >
+                                    Terms and Conditions
+                                </Button>
                             </span>
                         }
                     />
@@ -182,6 +209,9 @@ function FileUpload({user_metadata}) {
                         onUploadSuccess={async (event) => {
                             console.log('Upload success:', event);
                             setUploadSuccess(true);
+                            setUploadError(null);
+                            setProcessingSummary(null);
+                            setShowProcessingSummary(false);
                             setUploadMessage('File uploaded successfully. Processing your files...');
 
                             const fileKey = event?.key;
@@ -232,6 +262,66 @@ function FileUpload({user_metadata}) {
                         }}
                     >
                         Accept
+                    </Button>
+                </Modal.Footer>
+            </Modal>
+
+            <Modal
+                show={showProcessingSummary}
+                onHide={() => setShowProcessingSummary(false)}
+                size="lg"
+                scrollable
+            >
+                <Modal.Header closeButton>
+                    <Modal.Title>Processing Summary</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <section className="mb-4">
+                        <h5>Successful files ({processingSummary?.successfulFiles?.length || 0})</h5>
+                        {processingSummary?.successfulFiles?.length ? (
+                            <ul className="mb-0">
+                                {processingSummary.successfulFiles.map((fileName) => (
+                                    <li key={fileName}><code>{fileName}</code></li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="text-muted mb-0">No successful files.</p>
+                        )}
+                    </section>
+
+                    <section className="mb-4">
+                        <h5>Missing files ({processingSummary?.missingFiles?.length || 0})</h5>
+                        {processingSummary?.missingFiles?.length ? (
+                            <ul className="mb-0">
+                                {processingSummary.missingFiles.map((file, index) => (
+                                    <li key={`${file.prefix}-${file.fileType}-${index}`}>
+                                        <code>{file.expectedPattern}</code>
+                                        {file.prefix && <> &mdash; prefix: <code>{file.prefix}</code></>}
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="text-muted mb-0">No missing files.</p>
+                        )}
+                    </section>
+
+                    <section>
+                        <h5>Files with errors ({processingSummary?.filesWithErrors?.length || 0})</h5>
+                        {processingSummary?.filesWithErrors?.length ? (
+                            processingSummary.filesWithErrors.map((file, index) => (
+                                <Alert variant="danger" key={`${file.fileName}-${index}`}>
+                                    <div><code>{file.fileName}</code></div>
+                                    <div className="mt-1">{file.error}</div>
+                                </Alert>
+                            ))
+                        ) : (
+                            <p className="text-muted mb-0">No files with errors.</p>
+                        )}
+                    </section>
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button variant="secondary" onClick={() => setShowProcessingSummary(false)}>
+                        Close
                     </Button>
                 </Modal.Footer>
             </Modal>
