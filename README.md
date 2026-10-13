@@ -1,6 +1,9 @@
 # DET File Manager
 
-React frontend for the DET uploader.
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18778325.svg)](https://doi.org/10.5281/zenodo.18778325)
+[![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](LICENSE)
+
+React frontend for the DET uploader, part of the CRESCENT Dynamic Rupture, Earthquake Cycle, and Tsunami (DET) Code Verification Platform. The companion results dashboard is [v-v_dashboard](https://github.com/cascadiaquakes/v-v_dashboard) ([det.cascadiaquakes.org](https://det.cascadiaquakes.org/)).
 
 **Prod:** https://det-uploader.cascadiaquakes.org/
 **Dev:**  https://det-uploader.cascadiaquakes.org/dev/ (same backend, used to preview UI changes before they reach prod)
@@ -138,3 +141,33 @@ Only repository administrators can configure variables. These values are read by
 * **Fully isolated dev backend.** The dev environment currently shares the prod Cognito pool, S3 bucket and API. That's fine for previewing UI changes, but a dev user can still write real files to prod storage. A proper split would need a dev Cognito pool, a dev S3 bucket and a dev API stack, which is a backend coordination ask.
 
 ---
+
+## How to Cite
+
+> Bachelot, L., & Marfo, W. (2026). *DET File Manager* (v1.0.1). Zenodo. https://doi.org/10.5281/zenodo.18778325
+
+The platform is described in:
+
+> Bachelot, L., Kutschera, F., Barall, M., Erickson, B. A., Dunham, E. M., Gabriel, A.-A., Harris, R., Ma, S., Thomas, A. M., & Zhang, W. (2026). CRESCENT Earthquake Dynamic Rupture, Earthquake Cycle, and Tsunami Code Verification Platform. *Seismica*, 5(2). https://doi.org/10.26443/seismica.v5i2.2716
+
+---
+
+## License
+
+This project is licensed under the BSD 3-Clause License. See [LICENSE](LICENSE).
+
+---
+
+## Contacts
+
+- **Loïc Bachelot**, University of Oregon: [lbachelo@uoregon.edu](mailto:lbachelo@uoregon.edu)
+- **William Marfo**, University of California, Davis: [wmarfo@ucdavis.edu](mailto:wmarfo@ucdavis.edu)
+- **Amanda M. Thomas**, University of California, Davis: [amthom@ucdavis.edu](mailto:amthom@ucdavis.edu)
+
+For bugs or feature requests, please [open an issue](https://github.com/cascadiaquakes/det-file-manager/issues).
+
+---
+
+## Acknowledgments
+
+This project is supported by the National Science Foundation through the Cascadia Region Earthquake Science Center (CRESCENT), Cooperative Agreement EAR-2225286.
