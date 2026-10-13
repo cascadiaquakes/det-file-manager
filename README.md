@@ -6,6 +6,7 @@
 React frontend for uploading benchmark results to the CRESCENT Dynamic Rupture, Earthquake Cycle, and Tsunami (DET) Code Verification Platform. Uploaded results are compared in the companion [V&V dashboard](https://github.com/cascadiaquakes/v-v_dashboard).
 
 **Live uploader:** https://det-uploader.cascadiaquakes.org
+
 **Results dashboard:** https://det.cascadiaquakes.org
 
 ---
