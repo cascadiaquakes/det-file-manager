@@ -3,10 +3,25 @@
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18778325.svg)](https://doi.org/10.5281/zenodo.18778325)
 [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](LICENSE)
 
-React frontend for the DET uploader, part of the CRESCENT Dynamic Rupture, Earthquake Cycle, and Tsunami (DET) Code Verification Platform. The companion results dashboard is [v-v_dashboard](https://github.com/cascadiaquakes/v-v_dashboard) ([det.cascadiaquakes.org](https://det.cascadiaquakes.org/)).
+React frontend for uploading benchmark results to the CRESCENT Dynamic Rupture, Earthquake Cycle, and Tsunami (DET) Code Verification Platform. Uploaded results are compared in the companion [V&V dashboard](https://github.com/cascadiaquakes/v-v_dashboard).
 
-**Prod:** https://det-uploader.cascadiaquakes.org/
-**Dev:**  https://det-uploader.cascadiaquakes.org/dev/ (same backend, used to preview UI changes before they reach prod)
+**Live uploader:** https://det-uploader.cascadiaquakes.org
+**Results dashboard:** https://det.cascadiaquakes.org
+
+---
+
+## Documentation
+
+The platform is described in Bachelot et al. (2026), [*CRESCENT Earthquake Dynamic Rupture, Earthquake Cycle, and Tsunami Code Verification Platform*](https://doi.org/10.26443/seismica.v5i2.2716), *Seismica*.
+
+---
+
+## Features
+
+- Sign in with a CRESCENT platform account, or request access.
+- Choose a benchmark and upload result files for it.
+- See a processing summary after each upload, listing successful, failed and missing files.
+- Manage previous uploads, including deleting folders.
 
 ---
 
@@ -22,16 +37,15 @@ Static site (React + Vite) built, uploaded to **S3**, and served via **CloudFron
 
 ---
 
-## Local development
+## Running Locally
 
-**Prereqs:** Node.js 20+ and npm.
+**Prerequisites:** Node.js 20+ and npm.
 
 ```bash
 # 1. Create your local configuration from the template
 cp .env.example .env
 
-# 2. Fill in the required values in the new .env file (see the variable
-#    list in "One-Time Repository Setup" below, same names locally)
+# 2. Fill in the required values in .env (the variable names are listed in docs/MAINTAINERS.md)
 
 # 3. Install dependencies
 npm ci
@@ -43,102 +57,43 @@ npm start
 
 ---
 
+## Project Structure
+
+```
+det-file-manager/
+├── src/
+│   ├── components/       # File upload, benchmark links, upload management, header
+│   ├── App.js            # App shell and sign-in flow
+│   └── awsConfig.js      # Amplify / Cognito configuration
+├── public/               # Static assets (logos, manifest)
+├── docs/MAINTAINERS.md   # Admin setup, manual deploys, repo conventions
+├── .github/workflows/    # CI and deploy workflows
+├── deploy.sh             # Manual deploy script
+├── .env.example          # Template for local configuration
+└── vite.config.js
+```
+
+---
+
 ## Deployment
 
-The application can be deployed either manually from a local machine or automatically via the CI/CD pipeline.
+| Workflow | Trigger | What it does |
+|---|---|---|
+| `ci.yml` | Every PR | `npm ci`, Vitest, build, `npm audit` and a `gitleaks` secret scan; must pass before merging |
+| `deploy-dev.yml` | Push to `dev` | Deploys to https://det-uploader.cascadiaquakes.org/dev/ and invalidates only `/dev/*` |
+| `deploy.yml` | Push to `master` | Deploys to production and invalidates the whole distribution |
 
-### Manual deployment
+Day-to-day flow: open a PR to `dev`, let CI go green, merge, preview at the dev URL. When happy, open a PR `dev → master`, merge, and the production deploy runs.
 
-Requires the AWS CLI v2 to be configured with the necessary permissions.
-
-**macOS/Linux**
-
-```bash
-export DISTRIBUTION_ID=E394LPINKP5I9U   # CloudFront ID, for cache invalidation
-chmod +x ./deploy.sh                    # one-time on macOS/Linux
-./deploy.sh
-```
-
-**Windows PowerShell**
-
-```powershell
-$env:DISTRIBUTION_ID = "E394LPINKP5I9U"  # CloudFront ID, for cache invalidation
-./deploy.sh
-```
-
-The script builds, syncs to `s3://crescent-react-hosting/det-uploader-app/` with proper cache headers, then invalidates `/*` on CloudFront.
-
-**Verify:** open https://det-uploader.cascadiaquakes.org/ (hard refresh if needed).
-
----
-
-## CI/CD (GitHub Actions)
-
-Three workflows:
-
-**`.github/workflows/ci.yml`** runs on every PR. Does `npm ci`, `npm test` (Vitest), `npm run build`, `npm audit`, and a `gitleaks` secret scan. Has to pass before the PR can merge. `npm audit` is currently informational; flip `continue-on-error: false` when the Amplify dep tree ships fewer vulns and new vulns should actually gate the PR.
-
-**`.github/workflows/deploy.yml`** runs on push to `master`. Deploys to the prod prefix `s3://crescent-react-hosting/det-uploader-app/`, served at `det-uploader.cascadiaquakes.org/`. Invalidates the whole distribution.
-
-**`.github/workflows/deploy-dev.yml`** runs on push to `dev`. Deploys to `det-uploader-app/dev/`, served at `det-uploader.cascadiaquakes.org/dev/`. Only invalidates `/dev/*`, leaves prod cache alone.
-
-Day-to-day flow: open a PR to `dev`, let CI go green, merge, preview at the dev URL. When happy, open a PR `dev → master`, merge, prod deploy runs.
-
----
-
-## One-Time Repository Setup (Admin Task)
-
-For the CI/CD pipeline to function, a repository administrator must configure the following:
-
-### 1. AWS authentication (OIDC)
-
-The workflows assume `arn:aws:iam::818214664804:role/GitHubActionsDeployRole` via OpenID Connect. No long-lived access keys live in the repo. The role's trust policy must include `repo:cascadiaquakes/det-file-manager:ref:refs/heads/master` and `:dev` for deploys to work.
-
-### 2. Repository Variables
-
-These provide the non-secret configuration the build and deployment scripts read. **Names must match exactly.** An admin must retrieve the current values from the AWS account.
-
-* `AWS_REGION` = `us-west-2`
-* `S3_BUCKET` = `crescent-react-hosting`
-* `S3_PREFIX` = `det-uploader-app`
-* `CF_DISTRIBUTION_ID` = `<your_cloudfront_distribution_id>`
-* `VITE_AWS_REGION` = `us-west-2`
-* `VITE_S3_PROD_NAME` = `<your_prod_bucket_name>`
-* `VITE_AWS_USER_POOL_ID` = `<your_user_pool_id>`
-* `VITE_AWS_WEB_CLIENT_ID` = `<your_user_pool_client_id>`
-* `VITE_AWS_IDENTITY_POOL_ID` = `<your_identity_pool_id>`
-* `VITE_COGNITO_DOMAIN` = `<your_cognito_domain>`
-* `VITE_API_URL` = `<your_api_gateway_base_url>`
-
-### Step-by-step setup
-
-1. Repo → **Settings** → **Secrets and variables** → **Actions**
-2. **Variables** tab → **New repository variable**
-3. Add each variable from section 2 above (11 total)
-4. The **Secrets** tab should NOT contain `AWS_ACCESS_KEY_ID` or `AWS_SECRET_ACCESS_KEY`. Auth is OIDC; if those are still there from before the OIDC migration, delete them.
-
-Only repository administrators can configure variables. These values are read by the GitHub Actions workflows to authenticate with AWS and configure the build.
+Manual deploys, the one-time repository setup (OIDC role and repository variables) and repo conventions are in [docs/MAINTAINERS.md](docs/MAINTAINERS.md).
 
 ---
 
 ## Troubleshooting
 
-* **Auth errors on the frontend:** Ensure all `VITE_*` variables are set (locally in `.env`, or in repo Variables) and rebuild.
-* **AccessDenied on a path like `/dev/`:** The CloudFront Function `det-uploader-spa-rewriter` is either not associated with the distribution or got removed. Reattach it to the default behavior on the viewer-request event.
-* **Not seeing changes:** Confirm the workflow succeeded, the invalidation completed, and hard refresh the browser.
-
----
-
-## Repo hygiene
-
-* **Master is protected.** No direct pushes. Every change goes through a PR with at least one approving review. Force pushes and branch deletion are blocked. The CI check (`build-and-scan`) is required.
-* **Same applies in practice for `dev`.** It's not branch-protected at GitHub level (so you can push directly if you need to), but the team convention is to PR into dev too.
-* **Deploy roles are scoped per branch.** The IAM trust policy only allows OIDC token assumption from `refs/heads/master` and `refs/heads/dev`. PRs from forks or feature branches can't reach AWS.
-
-## What's still on the list
-
-* **More test coverage.** We have a Vitest smoke suite (`npm test`) that proves the app compiles and the Amplify sign-in screen renders. Component-level and authenticated-flow tests would need Amplify auth mocking, which we haven't taken on yet.
-* **Fully isolated dev backend.** The dev environment currently shares the prod Cognito pool, S3 bucket and API. That's fine for previewing UI changes, but a dev user can still write real files to prod storage. A proper split would need a dev Cognito pool, a dev S3 bucket and a dev API stack, which is a backend coordination ask.
+- **Auth errors on the frontend:** ensure all `VITE_*` variables are set (locally in `.env`, or in repo Variables) and rebuild.
+- **AccessDenied on a path like `/dev/`:** the CloudFront Function `det-uploader-spa-rewriter` is either not associated with the distribution or got removed. Reattach it to the default behavior on the viewer-request event.
+- **Not seeing changes:** confirm the workflow succeeded and the invalidation completed, then hard refresh the browser.
 
 ---
 
@@ -169,5 +124,11 @@ For bugs or feature requests, please [open an issue](https://github.com/cascadia
 ---
 
 ## Acknowledgments
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/cascadiaquakes/.github/main/assets/crescent-logo.png" alt="CRESCENT" height="70">
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="https://raw.githubusercontent.com/cascadiaquakes/.github/main/assets/nsf-logo.png" alt="U.S. National Science Foundation" height="70">
+</p>
 
 This project is supported by the National Science Foundation through the Cascadia Region Earthquake Science Center (CRESCENT), Cooperative Agreement EAR-2225286.
